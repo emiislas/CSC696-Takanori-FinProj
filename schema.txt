@@ -2,35 +2,29 @@
 
 ## 1. Idea
 
-Train a Variational Autoencoder on windowed trajectory data from the logistic Lotka-Volterra predator-prey model. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the **orbital phase** (where in the oscillation cycle a window sits) and the **carrying capacity K** (the parameter we vary across trajectories). Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with K.
+Train a Variational Autoencoder on windowed trajectory data from the solution of a simple parametarized ODE equation. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the parameters of the ODE e.g. \alpha, and \beta of a lotka-volterra model. Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with K.
 
 ## 2. Governing Equations
 
-Logistic Lotka-Volterra system:
-
-```
-dx₁/dt = α·x₁·(1 - x₁/K) - β·x₁·x₂
-dx₂/dt = δ·x₁·x₂ - γ·x₂
-```
-
-where x₁ = prey population, x₂ = predator population, and K is the carrying capacity (the free parameter we vary).
+Lotka-Volterra system
 
 ## 3. Fixed Parameters
 
-| Symbol | Value | Role                  |
-|--------|-------|-----------------------|
-| α      | 0.4   | Prey growth rate      |
-| β      | 0.02  | Predation rate        |
-| γ      | 0.4   | Predator death rate   |
-| δ      | 0.02  | Predator growth rate  |
+| Symbol | Value     | Role                  |
+|--------|-----------|-----------------------|
+| α      | 0.4       | Prey growth rate      |
+| β      | 0.02      | Predation rate        |
+| γ      | 0.4       | Predator death rate   |
+| δ      | 0.02      | Predator growth rate  |
 
-These remain constant across all trajectories. Only K varies.
+For the first tests only one parameter varies, while the other's stay static
+
 
 ## 4. Varied Parameter
 
 | Symbol | Values             | Role                |
 |--------|--------------------|---------------------|
-| K      | [50, 100, 150, 200] | Carrying capacity  |
+|  α     | [50, 100, 150, 200] | Carrying capacity  |
 
 Physical interpretation: as K increases, the environment supports a larger prey population, leading to larger oscillation amplitudes and a stronger predator response.
 
@@ -78,8 +72,8 @@ The mean and std are computed over the entire dataset and saved alongside the da
 
 **Encoder (shared):**
 ```
-Linear(40 → 128) → BatchNorm → ReLU
-Linear(128 → 64) → BatchNorm → ReLU
+Linear(40 → 128) → BatchNorm → TanH
+Linear(128 → 64) → BatchNorm → TanH
 ```
 
 **Encoder heads:**
@@ -95,8 +89,8 @@ z = μ + ε·exp(0.5·log_var),  ε ~ N(0, I)
 
 **Decoder:**
 ```
-Linear(latent_dim → 64)  → BatchNorm → ReLU
-Linear(64 → 128)         → BatchNorm → ReLU
+Linear(latent_dim → 64)  → BatchNorm → TanH
+Linear(64 → 128)         → BatchNorm → TanH
 Linear(128 → 40)         (no activation — data is unbounded after normalization)
 ```
 
@@ -124,9 +118,4 @@ KL:            -0.5 · mean(1 + log_var - μ² - exp(log_var))
 
 ## 12. Latent Space Assumptions
 
-| Dimension  | Expected role           |
-|------------|-------------------------|
-| z₁, z₂    | Orbital phase (circular structure within each K) |
-| z₃         | Carrying capacity K (separates trajectories)     |
-
-The assignment of roles to specific dimensions is not enforced — the VAE discovers it. After training, we identify the K-correlated axis via Pearson correlation between each latent dimension and the known K labels.
+The assignment of roles to specific dimensions is not enforced — the VAE discovers it. After training, we identify the parameter-correlated axis via Pearson correlation between each latent dimension and the known parameter labels.
