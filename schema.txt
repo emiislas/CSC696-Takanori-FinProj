@@ -1,0 +1,132 @@
+# Project Schema: Learning Latent Representations of Predator-Prey Dynamics with a VAE
+
+## 1. Idea
+
+Train a Variational Autoencoder on windowed trajectory data from the logistic Lotka-Volterra predator-prey model. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the **orbital phase** (where in the oscillation cycle a window sits) and the **carrying capacity K** (the parameter we vary across trajectories). Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with K.
+
+## 2. Governing Equations
+
+Logistic Lotka-Volterra system:
+
+```
+dx₁/dt = α·x₁·(1 - x₁/K) - β·x₁·x₂
+dx₂/dt = δ·x₁·x₂ - γ·x₂
+```
+
+where x₁ = prey population, x₂ = predator population, and K is the carrying capacity (the free parameter we vary).
+
+## 3. Fixed Parameters
+
+| Symbol | Value | Role                  |
+|--------|-------|-----------------------|
+| α      | 0.4   | Prey growth rate      |
+| β      | 0.02  | Predation rate        |
+| γ      | 0.4   | Predator death rate   |
+| δ      | 0.02  | Predator growth rate  |
+
+These remain constant across all trajectories. Only K varies.
+
+## 4. Varied Parameter
+
+| Symbol | Values             | Role                |
+|--------|--------------------|---------------------|
+| K      | [50, 100, 150, 200] | Carrying capacity  |
+
+Physical interpretation: as K increases, the environment supports a larger prey population, leading to larger oscillation amplitudes and a stronger predator response.
+
+## 5. Initial Conditions
+
+| Variable | Value |
+|----------|-------|
+| x₁(0)   | 10    |
+| x₂(0)   | 10    |
+
+Same for all trajectories so the only source of variation between trajectories is K.
+
+## 6. Numerical Integration
+
+| Setting       | Value    |
+|---------------|----------|
+| Solver        | `solve_ivp` (default RK45) |
+| Time span     | [0, 100] |
+| dt            | 0.1      |
+| Time steps    | 1000     |
+| rtol          | 1e-10    |
+| atol          | 1e-10    |
+
+## 7. Windowing
+
+| Setting       | Value    |
+|---------------|----------|
+| Window size   | 20 time steps (= 2.0 time units) |
+| Stride        | 5 time steps (= 0.5 time units)  |
+| Input shape   | (20, 2) flattened to (40,)       |
+
+Each training sample is a short segment of one trajectory containing both x₁ and x₂.
+
+## 8. Normalization
+
+Per-feature (per column of the flattened window) standardization:
+
+```
+x_norm = (x - x_mean) / (x_std + 1e-8)
+```
+
+The mean and std are computed over the entire dataset and saved alongside the data for denormalization at decode time.
+
+## 9. VAE Architecture
+
+**Encoder (shared):**
+```
+Linear(40 → 128) → BatchNorm → ReLU
+Linear(128 → 64) → BatchNorm → ReLU
+```
+
+**Encoder heads:**
+```
+fc_mu:      Linear(64 → latent_dim)
+fc_log_var: Linear(64 → latent_dim)
+```
+
+**Reparameterization:**
+```
+z = μ + ε·exp(0.5·log_var),  ε ~ N(0, I)
+```
+
+**Decoder:**
+```
+Linear(latent_dim → 64)  → BatchNorm → ReLU
+Linear(64 → 128)         → BatchNorm → ReLU
+Linear(128 → 40)         (no activation — data is unbounded after normalization)
+```
+
+## 10. Training Configuration
+
+| Setting         | Value   |
+|-----------------|---------|
+| Latent dim      | 3       |
+| Batch size      | 64      |
+| Epochs          | 100     |
+| Learning rate   | 1e-3    |
+| Optimizer       | Adam (weight_decay=1e-8) |
+| Scheduler       | ReduceLROnPlateau (factor=0.5, patience=5) |
+| Train/val split | 80/20   |
+| Beta (KL weight)| 1.0 (reduce to 0.1–0.5 if posterior collapse occurs) |
+
+## 11. Loss Function
+
+ELBO = Reconstruction + β · KL divergence
+
+```
+Reconstruction: MSE(x_recon, x)
+KL:            -0.5 · mean(1 + log_var - μ² - exp(log_var))
+```
+
+## 12. Latent Space Assumptions
+
+| Dimension  | Expected role           |
+|------------|-------------------------|
+| z₁, z₂    | Orbital phase (circular structure within each K) |
+| z₃         | Carrying capacity K (separates trajectories)     |
+
+The assignment of roles to specific dimensions is not enforced — the VAE discovers it. After training, we identify the K-correlated axis via Pearson correlation between each latent dimension and the known K labels.
