@@ -2,7 +2,7 @@
 
 ## 1. Idea
 
-Train a Variational Autoencoder on windowed trajectory data from the solution of a simple parametarized ODE equation. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the parameters of the ODE e.g. \alpha, and \beta of a lotka-volterra model. Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with K.
+Train a Variational Autoencoder on windowed trajectory data from the solution of a simple parametarized ODE equation. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the parameters of the ODE e.g. \alpha, and \beta of a lotka-volterra model. Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with each parameter.
 
 ## 2. Governing Equations
 
@@ -24,9 +24,9 @@ For the first tests only one parameter varies, while the other's stay static
 
 | Symbol | Values             | Role                |
 |--------|--------------------|---------------------|
-|  α     | [50, 100, 150, 200] | Carrying capacity  |
+|  α     | [0.1, 0.4, 0.6, 0.8] | Prey Growth rate  |
 
-Physical interpretation: as K increases, the environment supports a larger prey population, leading to larger oscillation amplitudes and a stronger predator response.
+Physical interpretation: as alpha increases, the environment supports a larger prey population growth.
 
 ## 5. Initial Conditions
 
@@ -35,7 +35,7 @@ Physical interpretation: as K increases, the environment supports a larger prey 
 | x₁(0)   | 10    |
 | x₂(0)   | 10    |
 
-Same for all trajectories so the only source of variation between trajectories is K.
+Same for all trajectories so the only source of variation between trajectories is α.
 
 ## 6. Numerical Integration
 
@@ -50,13 +50,15 @@ Same for all trajectories so the only source of variation between trajectories i
 
 ## 7. Windowing
 
-| Setting       | Value    |
-|---------------|----------|
-| Window size   | 20 time steps (= 2.0 time units) |
-| Stride        | 5 time steps (= 0.5 time units)  |
-| Input shape   | (20, 2) flattened to (40,)       |
+| Setting              | Value                                  |
+|----------------------|----------------------------------------|
+| Window size          | 350 time steps (= 35.0 time units)    |
+| Sampling method      | Random start indices (time-aligned)    |
+| Samples per trajectory | 5                                    |
+| Total samples        | 20 (4 α values × 5 samples)           |
+| Input shape          | (350, 2) flattened to (700,)           |
 
-Each training sample is a short segment of one trajectory containing both x₁ and x₂.
+Each training sample is a randomly placed segment of one trajectory containing both x₁ and x₂ from the same time window.
 
 ## 8. Normalization
 
@@ -72,8 +74,8 @@ The mean and std are computed over the entire dataset and saved alongside the da
 
 **Encoder (shared):**
 ```
-Linear(40 → 128) → BatchNorm → TanH
-Linear(128 → 64) → BatchNorm → TanH
+Linear(700 → 128) → BatchNorm → TanH
+Linear(128 → 64)  → BatchNorm → TanH
 ```
 
 **Encoder heads:**
@@ -91,7 +93,7 @@ z = μ + ε·exp(0.5·log_var),  ε ~ N(0, I)
 ```
 Linear(latent_dim → 64)  → BatchNorm → TanH
 Linear(64 → 128)         → BatchNorm → TanH
-Linear(128 → 40)         (no activation — data is unbounded after normalization)
+Linear(128 → 700)        (no activation — data is unbounded after normalization)
 ```
 
 ## 10. Training Configuration
