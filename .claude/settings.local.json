@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import torch; import scipy; import numpy; print\\('torch', torch.__version__\\); print\\('scipy', scipy.__version__\\); print\\('numpy', numpy.__version__\\)\")",
+      "Bash(python solve_lotka_volterra.py)",
+      "Bash(python export_for_d3.py)"
+    ]
+  }
+}

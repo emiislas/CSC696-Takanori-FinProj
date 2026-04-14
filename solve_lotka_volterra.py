@@ -29,7 +29,7 @@ for a in alphas:
 X_all = torch.tensor(np.array(X_all), dtype=torch.float32)  # (4, 1000, 2)
 
 window_size = 350           # 100 time steps 
-num_samples_per_traj = 5 # number of random windows to draw per trajectory
+num_samples_per_traj = 50 # number of random windows to draw per trajectory
 
 windows = []
 labels = []
@@ -44,7 +44,7 @@ for i, a in enumerate(alphas):
 
     for s in starts:
         w = traj[s : s + window_size, :]     # (window_size, 2) — both species, same time window
-        windows.append(w.reshape(-1))         # flatten to (window_size*2,)
+        windows.append(w.reshape(-1))        # flatten to (window_size*2,)
         labels.append(a)
 
 x = torch.stack(windows)          # (n_alphas*num_samp_per, window_size*d)
@@ -68,7 +68,7 @@ for ax in axes:
     ax.set_xlabel("Time")
     ax.legend()
 plt.tight_layout()
-plt.show()
+# plt.show()
 
 # Save
 torch.save({'x': x, 'y': y, 'x_mean': x_mean, 'x_std': x_std,

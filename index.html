@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lotka-Volterra VAE Latent Space Explorer</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+  h1 { text-align: center; padding: 16px 0 4px; font-size: 1.3rem; color: #a0c4ff; }
+  .subtitle { text-align: center; font-size: 0.85rem; color: #888; margin-bottom: 12px; }
+  .container { display: flex; gap: 16px; padding: 0 24px 24px; }
+  .panel { background: #16213e; border-radius: 10px; padding: 16px; }
+  .panel h2 { font-size: 0.95rem; color: #a0c4ff; margin-bottom: 8px; }
+  .left { flex: 1; min-width: 420px; }
+  .right { flex: 1; min-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+  .info { font-size: 0.8rem; color: #888; margin-top: 6px; }
+  .legend { display: flex; gap: 16px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #444; }
+  .traj-panel { flex: 1; }
+  .decoded-label { font-size: 0.8rem; color: #ffd166; margin-top: 4px; }
+  svg { display: block; }
+  .crosshair { pointer-events: none; }
+  .grid-cell { cursor: crosshair; }
+  .sample-dot { cursor: pointer; }
+  .sample-dot:hover { stroke-width: 3px !important; }
+</style>
+</head>
+<body>
+
+<h1>Lotka-Volterra VAE Latent Space Explorer</h1>
+<p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
+
+<div class="container">
+  <div class="panel left">
+    <h2>Latent Space (z<sub>1</sub> vs z<sub>2</sub>)</h2>
+    <div id="latent-plot"></div>
+    <div class="legend" id="legend"></div>
+    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode from the latent grid.</p>
+  </div>
+  <div class="right">
+    <div class="panel traj-panel">
+      <h2>Prey x<sub>1</sub>(t)</h2>
+      <div id="prey-plot"></div>
+      <div class="decoded-label" id="prey-label"></div>
+    </div>
+    <div class="panel traj-panel">
+      <h2>Predator x<sub>2</sub>(t)</h2>
+      <div id="pred-plot"></div>
+      <div class="decoded-label" id="pred-label"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const W = 460, H = 400;
+const margin = {top: 20, right: 20, bottom: 40, left: 50};
+const tw = 440, th = 160;
+const tm = {top: 10, right: 20, bottom: 30, left: 55};
+
+d3.json('data_for_d3.json').then(data => {
+  const { samples, grid, meta } = data;
+
+  // Color scale for alpha
+  const alphaVals = meta.alphas.map(a => +a.toFixed(1));
+  const color = d3.scaleOrdinal()
+    .domain(alphaVals)
+    .range(['#ef476f', '#ffd166', '#06d6a0', '#118ab2']);
+
+  // --- Legend ---
+  const legend = d3.select('#legend');
+  alphaVals.forEach(a => {
+    const item = legend.append('div').attr('class', 'legend-item');
+    item.append('div').attr('class', 'legend-swatch').style('background', color(a));
+    item.append('span').text(`\u03b1 = ${a}`);
+  });
+
+  // --- Latent Space Plot ---
+  const xScale = d3.scaleLinear().domain(meta.z1_range).range([margin.left, W - margin.right]);
+  const yScale = d3.scaleLinear().domain(meta.z2_range).range([H - margin.bottom, margin.top]);
+
+  const svg = d3.select('#latent-plot').append('svg')
+    .attr('width', W).attr('height', H);
+
+  // Background rect for click detection
+  svg.append('rect')
+    .attr('class', 'grid-cell')
+    .attr('x', margin.left).attr('y', margin.top)
+    .attr('width', W - margin.left - margin.right)
+    .attr('height', H - margin.top - margin.bottom)
+    .attr('fill', '#0f1a30')
+    .on('click', function(event) {
+      const [mx, my] = d3.pointer(event);
+      const z1 = xScale.invert(mx);
+      const z2 = yScale.invert(my);
+      showNearestGridDecode(z1, z2);
+    });
+
+  // Axes
+  svg.append('g')
+    .attr('transform', `translate(0,${H - margin.bottom})`)
+    .call(d3.axisBottom(xScale).ticks(6))
+    .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+  svg.append('g')
+    .attr('transform', `translate(${margin.left},0)`)
+    .call(d3.axisLeft(yScale).ticks(6))
+    .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+
+  // Axis labels
+  svg.append('text').attr('x', W / 2).attr('y', H - 2)
+    .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem').text('z\u2081');
+  svg.append('text').attr('x', 14).attr('y', H / 2)
+    .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem')
+    .attr('transform', `rotate(-90,14,${H/2})`).text('z\u2082');
+
+  // Crosshair
+  const crossV = svg.append('line').attr('class', 'crosshair')
+    .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
+  const crossH = svg.append('line').attr('class', 'crosshair')
+    .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
+
+  // Sample dots
+  svg.selectAll('.sample-dot')
+    .data(samples)
+    .join('circle')
+    .attr('class', 'sample-dot')
+    .attr('cx', d => xScale(d.z[0]))
+    .attr('cy', d => yScale(d.z[1]))
+    .attr('r', 7)
+    .attr('fill', d => color(+d.alpha.toFixed(1)))
+    .attr('stroke', '#fff')
+    .attr('stroke-width', 1.5)
+    .attr('opacity', 0.9)
+    .on('click', function(event, d) {
+      event.stopPropagation();
+      highlightDot(this);
+      showTrajectory(d.prey, d.predator, `Sample #${d.id} (\u03b1 = ${d.alpha.toFixed(1)})`, color(+d.alpha.toFixed(1)));
+      moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+    });
+
+  // --- Trajectory Plots ---
+  function makeTrajectoryPlot(containerId) {
+    const s = d3.select(containerId).append('svg')
+      .attr('width', tw).attr('height', th);
+    s.append('g').attr('class', 'x-axis')
+      .attr('transform', `translate(0,${th - tm.bottom})`);
+    s.append('g').attr('class', 'y-axis')
+      .attr('transform', `translate(${tm.left},0)`);
+    s.append('path').attr('class', 'line')
+      .attr('fill', 'none').attr('stroke-width', 1.5);
+    s.append('text').attr('class', 'ax-label')
+      .attr('x', tw / 2).attr('y', th - 2)
+      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.75rem').text('Time');
+    return s;
+  }
+
+  const preySvg = makeTrajectoryPlot('#prey-plot');
+  const predSvg = makeTrajectoryPlot('#pred-plot');
+
+  function drawLine(svg, values, lineColor, labelEl, label) {
+    const tVals = values.map((_, i) => i * meta.dt);
+    const xS = d3.scaleLinear().domain([0, d3.max(tVals)]).range([tm.left, tw - tm.right]);
+    const yS = d3.scaleLinear().domain(d3.extent(values)).nice().range([th - tm.bottom, tm.top]);
+
+    svg.select('.x-axis').call(d3.axisBottom(xS).ticks(5))
+      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
+    svg.select('.y-axis').call(d3.axisLeft(yS).ticks(4))
+      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
+
+    const line = d3.line().x((_, i) => xS(tVals[i])).y(d => yS(d));
+    svg.select('.line')
+      .datum(values)
+      .attr('d', line)
+      .attr('stroke', lineColor);
+
+    d3.select(labelEl).text(label);
+  }
+
+  function showTrajectory(prey, predator, label, lineColor) {
+    drawLine(preySvg, prey, lineColor, '#prey-label', label);
+    drawLine(predSvg, predator, lineColor, '#pred-label', label);
+  }
+
+  function showNearestGridDecode(z1, z2) {
+    let best = null, bestDist = Infinity;
+    for (const g of grid) {
+      const d = (g.z[0] - z1) ** 2 + (g.z[1] - z2) ** 2;
+      if (d < bestDist) { bestDist = d; best = g; }
+    }
+    if (best) {
+      const label = `Decoded at z = [${best.z[0].toFixed(2)}, ${best.z[1].toFixed(2)}]`;
+      showTrajectory(best.prey, best.predator, label, '#ffd166');
+      moveCrosshair(xScale(best.z[0]), yScale(best.z[1]));
+      clearHighlight();
+    }
+  }
+
+  function moveCrosshair(cx, cy) {
+    crossV.attr('x1', cx).attr('x2', cx).attr('y1', margin.top).attr('y2', H - margin.bottom);
+    crossH.attr('x1', margin.left).attr('x2', W - margin.right).attr('y1', cy).attr('y2', cy);
+  }
+
+  let prevDot = null;
+  function highlightDot(el) {
+    if (prevDot) d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7);
+    d3.select(el).attr('stroke', '#ffd166').attr('stroke-width', 3).attr('r', 9);
+    prevDot = el;
+  }
+  function clearHighlight() {
+    if (prevDot) { d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7); prevDot = null; }
+  }
+
+  // Show first sample by default
+  if (samples.length > 0) {
+    const d = samples[0];
+    showTrajectory(d.prey, d.predator, `Sample #0 (\u03b1 = ${d.alpha.toFixed(1)})`, color(+d.alpha.toFixed(1)));
+    moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+  }
+});
+</script>
+</body>
+</html>

@@ -22,8 +22,8 @@ train_loader = DataLoader(TensorDataset(x_train, y_train), batch_size=64, shuffl
 val_loader = DataLoader(TensorDataset(x_val, y_val), batch_size=64, shuffle=False)
 
 # Train
-model = VAE(input_width=input_width, latent_dim=3, learning_rate=1e-3)
-train_losses, val_losses = model.train_model(train_loader, val_loader, epochs=100, beta=1.0)
+model = VAE(input_width=input_width, latent_dim=2, learning_rate=1e-3)
+train_losses, val_losses = model.train_model(train_loader, val_loader, epochs=500, beta=1.0)
 
 # Plot losses
 plt.figure(figsize=(8, 4))
@@ -35,7 +35,7 @@ plt.title('VAE Training Loss')
 plt.legend()
 plt.tight_layout()
 plt.savefig('vae_loss_curve.png', dpi=150)
-plt.show()
+# plt.show()
 
 # Save weights
 torch.save(model.state_dict(), 'vae_lotkavolt.pt')

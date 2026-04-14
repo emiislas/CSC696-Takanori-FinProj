@@ -3,7 +3,9 @@ Final project for csc 696, based around interpreting ODE parameters through VAE'
 
 
 * Emiliano
-x Finish VAE code, project schema and, dataset generation
+x Finish VAE code
+x project schema
+x dataset generation
 
 * Noel
  Make sure everything makes sense/works, make draft viz
