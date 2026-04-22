@@ -51,18 +51,22 @@ class VAE(torch.nn.Module):
         kl_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
         return recon_loss + beta * kl_loss, recon_loss, kl_loss
 
-    def train_model(self, train_loader, val_loader, epochs, beta=1.0):
+    def train_model(self, train_loader, val_loader, epochs, beta=1.0, beta_anneal_epochs=0):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.alpha, weight_decay=1e-8)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode='min', factor=0.5, patience=5)
         train_losses, val_losses = [], []
         for epoch in range(epochs):
+            if beta_anneal_epochs > 0 and epoch < beta_anneal_epochs:
+                current_beta = beta * (epoch / beta_anneal_epochs)
+            else:
+                current_beta = beta
             self.train()
             epoch_loss = 0
             for batch_x, _ in train_loader:
                 optimizer.zero_grad()
                 x_recon, mu, log_var = self.forward(batch_x)
-                loss, _, _ = self.vae_loss(x_recon, batch_x, mu, log_var, beta)
+                loss, _, _ = self.vae_loss(x_recon, batch_x, mu, log_var, current_beta)
                 loss.backward()
                 optimizer.step()
                 epoch_loss += loss.item()
@@ -74,7 +78,7 @@ class VAE(torch.nn.Module):
             with torch.no_grad():
                 for batch_x, _ in val_loader:
                     x_recon, mu, log_var = self.forward(batch_x)
-                    loss, _, _ = self.vae_loss(x_recon, batch_x, mu, log_var, beta)
+                    loss, _, _ = self.vae_loss(x_recon, batch_x, mu, log_var, current_beta)
                     val_loss += loss.item()
             avg_val = val_loss / len(val_loader)
             val_losses.append(avg_val)

@@ -17,7 +17,7 @@ dt = 0.1
 t_vals = np.arange(0, 100, dt)
 y0 = [10, 10]
 
-alphas = [0.1, 0.4, 0.6, 0.8]
+alphas = np.linspace(0.1, 0.8, 20).tolist()
 
 X_all = []
 for a in alphas:

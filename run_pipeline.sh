@@ -10,4 +10,6 @@ python train_vae_lotkavolt.py
 echo "=== Step 3: Exporting data for D3 ==="
 python export_for_d3.py
 
-echo "=== Done. Open http://localhost:8000 ==="
+echo "=== Step 4: Launching visualization ==="
+echo "Open http://localhost:8000/index.html in your browser"
+python -m http.server 8000

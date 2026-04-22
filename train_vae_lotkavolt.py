@@ -23,7 +23,7 @@ val_loader = DataLoader(TensorDataset(x_val, y_val), batch_size=64, shuffle=Fals
 
 # Train
 model = VAE(input_width=input_width, latent_dim=2, learning_rate=1e-3)
-train_losses, val_losses = model.train_model(train_loader, val_loader, epochs=500, beta=1.0)
+train_losses, val_losses = model.train_model(train_loader, val_loader, epochs=500, beta=1.0, beta_anneal_epochs=100)
 
 # Plot losses
 plt.figure(figsize=(8, 4))

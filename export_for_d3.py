@@ -28,15 +28,26 @@ alphas = y.numpy()
 def denorm(flat):
     return (flat * x_std + x_mean).numpy()
 
-# Build sample list
+# Only display samples whose training alpha is closest to one of these 4 values
+display_alphas = [0.1, 0.4, 0.6, 0.8]
+all_train_alphas = sorted(set(float(a) for a in alphas))
+train_to_display = {}
+for da in display_alphas:
+    closest = min(all_train_alphas, key=lambda a, da=da: abs(a - da))
+    train_to_display[closest] = da
+
+# Build sample list (filtered to display alphas)
 samples = []
 for i in range(x.shape[0]):
+    a = float(alphas[i])
+    if a not in train_to_display:
+        continue
     raw = denorm(x[i])  # (700,) interleaved: [prey0, pred0, prey1, pred1, ...]
     prey = raw[0::2].tolist()
     predator = raw[1::2].tolist()
     samples.append({
-        'id': i,
-        'alpha': float(alphas[i]),
+        'id': len(samples),
+        'alpha': train_to_display[a],
         'z': z[i].tolist(),
         'prey': prey,
         'predator': predator,
@@ -49,7 +60,7 @@ z_mean = z.mean(axis=0)
 padding = 0.3
 
 # Generate decoded grid over z1 x z2
-grid_n = 20
+grid_n = 100
 z1_range = np.linspace(z_min[0] - padding, z_max[0] + padding, grid_n)
 z2_range = np.linspace(z_min[1] - padding, z_max[1] + padding, grid_n)
 
@@ -77,7 +88,7 @@ output = {
         'grid_n': grid_n,
         'z1_range': [float(z_min[0] - padding), float(z_max[0] + padding)],
         'z2_range': [float(z_min[1] - padding), float(z_max[1] + padding)],
-        'alphas': sorted(set(float(a) for a in alphas)),
+        'alphas': display_alphas,
     }
 }
 

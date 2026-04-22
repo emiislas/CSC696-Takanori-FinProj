@@ -37,7 +37,7 @@
     <h2>Latent Space (z<sub>1</sub> vs z<sub>2</sub>)</h2>
     <div id="latent-plot"></div>
     <div class="legend" id="legend"></div>
-    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode from the latent grid.</p>
+    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode from the latent grid. <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan, <strong>double-click</strong> to reset.</p>
   </div>
   <div class="right">
     <div class="panel traj-panel">
@@ -83,6 +83,13 @@ d3.json('data_for_d3.json').then(data => {
   const svg = d3.select('#latent-plot').append('svg')
     .attr('width', W).attr('height', H);
 
+  // Clip path so dots don't overflow on zoom
+  svg.append('defs').append('clipPath').attr('id', 'clip')
+    .append('rect')
+    .attr('x', margin.left).attr('y', margin.top)
+    .attr('width', W - margin.left - margin.right)
+    .attr('height', H - margin.top - margin.bottom);
+
   // Background rect for click detection
   svg.append('rect')
     .attr('class', 'grid-cell')
@@ -97,15 +104,15 @@ d3.json('data_for_d3.json').then(data => {
       showNearestGridDecode(z1, z2);
     });
 
-  // Axes
-  svg.append('g')
+  // Axes (saved as variables for zoom updates)
+  const xAxisG = svg.append('g')
     .attr('transform', `translate(0,${H - margin.bottom})`)
-    .call(d3.axisBottom(xScale).ticks(6))
-    .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
-  svg.append('g')
+    .call(d3.axisBottom(xScale).ticks(6));
+  xAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+  const yAxisG = svg.append('g')
     .attr('transform', `translate(${margin.left},0)`)
-    .call(d3.axisLeft(yScale).ticks(6))
-    .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+    .call(d3.axisLeft(yScale).ticks(6));
+  yAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
 
   // Axis labels
   svg.append('text').attr('x', W / 2).attr('y', H - 2)
@@ -120,8 +127,9 @@ d3.json('data_for_d3.json').then(data => {
   const crossH = svg.append('line').attr('class', 'crosshair')
     .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
 
-  // Sample dots
-  svg.selectAll('.sample-dot')
+  // Sample dots (in clipped group for zoom)
+  const dotGroup = svg.append('g').attr('clip-path', 'url(#clip)');
+  dotGroup.selectAll('.sample-dot')
     .data(samples)
     .join('circle')
     .attr('class', 'sample-dot')
@@ -138,6 +146,32 @@ d3.json('data_for_d3.json').then(data => {
       showTrajectory(d.prey, d.predator, `Sample #${d.id} (\u03b1 = ${d.alpha.toFixed(1)})`, color(+d.alpha.toFixed(1)));
       moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
     });
+
+  // --- Zoom behavior ---
+  const xScale0 = xScale.copy();
+  const yScale0 = yScale.copy();
+
+  const zoom = d3.zoom()
+    .scaleExtent([1, 20])
+    .translateExtent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
+    .extent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
+    .on('zoom', function(event) {
+      const newX = event.transform.rescaleX(xScale0);
+      const newY = event.transform.rescaleY(yScale0);
+      xScale.domain(newX.domain());
+      yScale.domain(newY.domain());
+
+      xAxisG.call(d3.axisBottom(xScale).ticks(6))
+        .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+      yAxisG.call(d3.axisLeft(yScale).ticks(6))
+        .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+
+      dotGroup.selectAll('.sample-dot')
+        .attr('cx', d => xScale(d.z[0]))
+        .attr('cy', d => yScale(d.z[1]));
+    });
+
+  svg.call(zoom);
 
   // --- Trajectory Plots ---
   function makeTrajectoryPlot(containerId) {
