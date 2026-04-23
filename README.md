@@ -3,12 +3,16 @@ Final project for csc 696, based around interpreting ODE parameters through VAE'
 
 
 * Emiliano
-x Finish VAE code
-x project schema
-x dataset generation
+1.- Update data generation to sequential windows rather than random 
+2.- Add capabilities for different ODE's
+3.- Test capabilities for multiple parameters swept
 
 * Noel
- Make sure everything makes sense/works, make draft viz
+1.- See if VAE reconstruction loss can be improved (I would avoid anything with convolutional neural networks at the moment)
+    (my thoughts on some of the improvement suggestions - emiliano)
+    1.1 Physics informed loss might work albeit we would need a different loss for each different equation.
+    2.2 Neural ODE decoder might be a bit too complex
+2.- Maybe add an additional visualization, one I was thinking about was two plots one that is parameter value vs phase angle, and another parameter value vs amplitude.
 
 # Latent Representations of Predator-Prey Dynamics with a VAE
 
