@@ -26,29 +26,30 @@ for a in alphas:
                     t_eval=t_vals, rtol=1e-10, atol=1e-10).y.T
     X_all.append(sol)
 
-X_all = torch.tensor(np.array(X_all), dtype=torch.float32)  # (4, 1000, 2)
+X_all = torch.tensor(np.array(X_all), dtype=torch.float32) # (4, 1000, 2)
 
-window_size = 350           # 100 time steps 
-num_samples_per_traj = 50 # number of random windows to draw per trajectory
+window_size = 350 # 100 time steps 
+num_windows_per_traj = 40 # number of random windows to draw per trajectory
+shift_percent = 0.04
 
 windows = []
 labels = []
 rng = np.random.default_rng()
 
-for i, a in enumerate(alphas):
-    traj = X_all[i]                          # (1000, 2)
-    max_start = traj.shape[0] - window_size  
+for i,a in enumerate(alphas):
+    traj = X_all[i]  
 
-    # draw random start indices (time-aligned for x1 and x2)
-    starts = rng.integers(0, max_start + 1, size=num_samples_per_traj)
+    for j in range(num_windows_per_traj):
+        
+        start = int(j*(shift_percent * window_size))
 
-    for s in starts:
-        w = traj[s : s + window_size, :]     # (window_size, 2) — both species, same time window
-        windows.append(w.reshape(-1))        # flatten to (window_size*2,)
+        w = traj[start : start + window_size, :] # (window_size, 2) — both species, same time window
+        windows.append(w.reshape(-1)) # flatten to (window_size*2,)
         labels.append(a)
 
-x = torch.stack(windows)          # (n_alphas*num_samp_per, window_size*d)
-y = torch.tensor(labels)          # (n_alphas*num_samp_per,)
+
+x = torch.stack(windows) # (n_alphas*num_samp_per, window_size*d)
+y = torch.tensor(labels) # (n_alphas*num_samp_per,)
 
 # Normalize
 x_mean = x.mean(dim=0)

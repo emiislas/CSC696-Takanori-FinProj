@@ -37,3 +37,6 @@
 - **File:** `export_for_d3.py` — Exports `model.decoder` to `decoder.onnx` (opset 14, dynamic batch axis) and now includes `x_mean`/`x_std` in `data_for_d3.json` for denormalization. Removed the 100x100 precomputed decode grid, shrinking the JSON substantially.
 - **File:** `index.html` — Loads `onnxruntime-web` from CDN and creates an `InferenceSession` alongside the JSON fetch. Empty-space clicks now run the decoder live on the clicked (z1, z2) instead of snapping to the nearest grid point; the 700-dim output is denormalized in JS and split into prey/predator series.
 - **Verified:** PyTorch decode vs ONNX decode match to ~1e-6 on the test points checked.
+
+## 10. Sequential window sampling
+- Changed data generation s.t. instead of sampling random windows per trajectory we sample sequential windows which results on more uniform points in the latent space.
