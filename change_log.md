@@ -32,3 +32,7 @@
 
 ## 8. Neural ODE Decoder (Improvement 3) — REVERTED
 - Was implemented but reverted. The `NeuralODEVAE` class was removed from `vae.py` and the training/export scripts were restored to use the plain `VAE`. The approach remains documented in `IMPROVEMENTS.md` as a future option.
+
+
+## 9. Sequential window sampling
+- Changed data generation s.t. instead of sampling random windows per trajectory we sample sequential windows which results on more uniform points in the latent space.

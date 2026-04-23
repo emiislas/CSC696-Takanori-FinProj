@@ -53,12 +53,12 @@ Same for all trajectories so the only source of variation between trajectories i
 | Setting              | Value                                  |
 |----------------------|----------------------------------------|
 | Window size          | 350 time steps (= 35.0 time units)    |
-| Sampling method      | Random start indices (time-aligned)    |
-| Samples per trajectory | 5                                    |
+| Sampling method      | Sequential windows with a shift       |
+| Samples per trajectory | 40                                    |
 | Total samples        | 20 (4 α values × 5 samples)           |
 | Input shape          | (350, 2) flattened to (700,)           |
 
-Each training sample is a randomly placed segment of one trajectory containing both x₁ and x₂ from the same time window.
+Each training sample is a sequential placed segment of one trajectory containing both x₁ and x₂ from the same time window.
 
 ## 8. Normalization
 
