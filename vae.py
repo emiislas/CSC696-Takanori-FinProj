@@ -8,7 +8,10 @@ class VAE(torch.nn.Module):
     def __init__(self, input_width, latent_dim=3, learning_rate=1e-3):
         super(VAE, self).__init__()
         self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(input_width, 128),
+            torch.nn.Linear(input_width, 256),
+            torch.nn.BatchNorm1d(256),
+            torch.nn.Tanh(),
+            torch.nn.Linear(256, 128),
             torch.nn.BatchNorm1d(128),
             torch.nn.Tanh(),
             torch.nn.Linear(128, 64),
@@ -24,7 +27,10 @@ class VAE(torch.nn.Module):
             torch.nn.Linear(64, 128),
             torch.nn.BatchNorm1d(128),
             torch.nn.Tanh(),
-            torch.nn.Linear(128, input_width),
+            torch.nn.Linear(128, 256),
+            torch.nn.BatchNorm1d(256),
+            torch.nn.Tanh(),
+            torch.nn.Linear(256, input_width),
         )
         self.latent_dim = latent_dim
         self.alpha = learning_rate

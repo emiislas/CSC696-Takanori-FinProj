@@ -10,25 +10,30 @@
 - Added a clip path so dots stay within the plot area when zoomed.
 - Saved axis group references (`xAxisG`, `yAxisG`) and wrapped dots in a clipped `<g>` for zoom redraws.
 
-## 3. Created Improvements Roadmap
-- **File:** `IMPROVEMENTS.md`
-- Documented 6 possible improvements: more training data, physics-informed loss, Neural ODE decoder, beta annealing, deeper network, and continuous latent decoding.
-
-## 4. More Training Data (Improvement 1)
+## 3. More Training Data
 - **File:** `solve_lotka_volterra.py`
 - Changed from 4 hardcoded alpha values to 20 evenly spaced values via `np.linspace(0.1, 0.8, 20)`, giving 1,000 training samples instead of 200.
 
-## 5. Beta Annealing (Improvement 4)
+## 4. Beta Annealing
 - **File:** `vae.py` — Added `beta_anneal_epochs` parameter to `VAE.train_model`. Beta linearly ramps from 0 to target over the specified number of epochs.
 - **File:** `train_vae_lotkavolt.py` — Set `beta_anneal_epochs=100` (ramp over first 100 of 500 epochs).
 
-## 6. Filtered Display Alphas
+## 5. Filtered Display Alphas
 - **File:** `export_for_d3.py`
 - Training uses 20 alphas, but visualization only shows samples from the 4 closest to the original values (0.1, 0.4, 0.6, 0.8). Keeps the scatter plot clean while benefiting from denser training coverage.
 
-## 7. Dense Interpolation Grid (Improvement 6c)
+## 6. Dense Interpolation Grid
 - **File:** `export_for_d3.py`
 - Increased grid from 20x20 to 100x100 (10,000 decode points) so clicking anywhere in the latent space snaps to a very nearby grid point.
 
-## 8. Neural ODE Decoder (Improvement 3) — REVERTED
-- Was implemented but reverted. The `NeuralODEVAE` class was removed from `vae.py` and the training/export scripts were restored to use the plain `VAE`. The approach remains documented in `IMPROVEMENTS.md` as a future option.
+## 7. Neural ODE Decoder — Attempted and Reverted
+- The `NeuralODEVAE` class was implemented in `vae.py` and then removed; training/export scripts were restored to use the plain `VAE`. The approach remains documented in `improvements.md` as a future option.
+
+## 8. Deeper Network
+- **File:** `vae.py`
+- Added an extra 256-unit layer at both ends of the VAE, so the architecture is now `700 -> 256 -> 128 -> 64 -> 2 latent -> 64 -> 128 -> 256 -> 700` (previously `700 -> 128 -> 64 -> 2 -> 64 -> 128 -> 700`). Each new linear layer is followed by `BatchNorm1d` + `Tanh`, matching the existing blocks.
+
+## 9. Client-Side Decoding via ONNX Runtime Web
+- **File:** `export_for_d3.py` — Exports `model.decoder` to `decoder.onnx` (opset 14, dynamic batch axis) and now includes `x_mean`/`x_std` in `data_for_d3.json` for denormalization. Removed the 100x100 precomputed decode grid, shrinking the JSON substantially.
+- **File:** `index.html` — Loads `onnxruntime-web` from CDN and creates an `InferenceSession` alongside the JSON fetch. Empty-space clicks now run the decoder live on the clicked (z1, z2) instead of snapping to the nearest grid point; the 700-dim output is denormalized in JS and split into prey/predator series.
+- **Verified:** PyTorch decode vs ONNX decode match to ~1e-6 on the test points checked.
