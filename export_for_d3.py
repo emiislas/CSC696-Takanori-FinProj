@@ -56,36 +56,29 @@ for i in range(x.shape[0]):
 # Determine latent axis ranges from encoded data
 z_min = z.min(axis=0)
 z_max = z.max(axis=0)
-z_mean = z.mean(axis=0)
 padding = 0.3
 
-# Generate decoded grid over z1 x z2
-grid_n = 100
-z1_range = np.linspace(z_min[0] - padding, z_max[0] + padding, grid_n)
-z2_range = np.linspace(z_min[1] - padding, z_max[1] + padding, grid_n)
-
-grid = []
-for z1 in z1_range:
-    for z2 in z2_range:
-        zpt = torch.tensor([[z1, z2]], dtype=torch.float32)
-        with torch.no_grad():
-            decoded = model.decode(zpt)[0]
-        raw = denorm(decoded)
-        prey = raw[0::2].tolist()
-        predator = raw[1::2].tolist()
-        grid.append({
-            'z': [float(z1), float(z2)],
-            'prey': prey,
-            'predator': predator,
-        })
+# Export decoder to ONNX for client-side inference (Improvement 4a)
+dummy_z = torch.zeros(1, 2, dtype=torch.float32)
+torch.onnx.export(
+    model.decoder,
+    (dummy_z,),
+    'decoder.onnx',
+    input_names=['z'],
+    output_names=['x_recon'],
+    dynamic_axes={'z': {0: 'batch'}, 'x_recon': {0: 'batch'}},
+    opset_version=14,
+    dynamo=False,
+)
+print("Exported decoder to decoder.onnx")
 
 output = {
     'samples': samples,
-    'grid': grid,
+    'x_mean': x_mean.tolist(),
+    'x_std': x_std.tolist(),
     'meta': {
         'window_size': int(window_size),
         'dt': dt,
-        'grid_n': grid_n,
         'z1_range': [float(z_min[0] - padding), float(z_max[0] + padding)],
         'z2_range': [float(z_min[1] - padding), float(z_max[1] + padding)],
         'alphas': display_alphas,
@@ -95,4 +88,4 @@ output = {
 with open('data_for_d3.json', 'w') as f:
     json.dump(output, f)
 
-print(f"Exported {len(samples)} samples and {len(grid)} grid points to data_for_d3.json")
+print(f"Exported {len(samples)} samples to data_for_d3.json (decoder grid replaced by ONNX runtime)")

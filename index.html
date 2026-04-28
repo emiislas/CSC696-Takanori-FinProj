@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Lotka-Volterra VAE Latent Space Explorer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
@@ -37,7 +38,7 @@
     <h2>Latent Space (z<sub>1</sub> vs z<sub>2</sub>)</h2>
     <div id="latent-plot"></div>
     <div class="legend" id="legend"></div>
-    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode from the latent grid. <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan, <strong>double-click</strong> to reset.</p>
+    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode that latent point live (in-browser via ONNX). <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan, <strong>double-click</strong> to reset.</p>
   </div>
   <div class="right">
     <div class="panel traj-panel">
@@ -59,8 +60,13 @@ const margin = {top: 20, right: 20, bottom: 40, left: 50};
 const tw = 440, th = 160;
 const tm = {top: 10, right: 20, bottom: 30, left: 55};
 
-d3.json('data_for_d3.json').then(data => {
-  const { samples, grid, meta } = data;
+Promise.all([
+  d3.json('data_for_d3.json'),
+  ort.InferenceSession.create('decoder.onnx'),
+]).then(([data, session]) => {
+  const { samples, x_mean, x_std, meta } = data;
+  const xMean = Float32Array.from(x_mean);
+  const xStd = Float32Array.from(x_std);
 
   // Color scale for alpha
   const alphaVals = meta.alphas.map(a => +a.toFixed(1));
@@ -101,7 +107,7 @@ d3.json('data_for_d3.json').then(data => {
       const [mx, my] = d3.pointer(event);
       const z1 = xScale.invert(mx);
       const z2 = yScale.invert(my);
-      showNearestGridDecode(z1, z2);
+      decodeAt(z1, z2);
     });
 
   // Axes (saved as variables for zoom updates)
@@ -216,18 +222,21 @@ d3.json('data_for_d3.json').then(data => {
     drawLine(predSvg, predator, lineColor, '#pred-label', label);
   }
 
-  function showNearestGridDecode(z1, z2) {
-    let best = null, bestDist = Infinity;
-    for (const g of grid) {
-      const d = (g.z[0] - z1) ** 2 + (g.z[1] - z2) ** 2;
-      if (d < bestDist) { bestDist = d; best = g; }
+  async function decodeAt(z1, z2) {
+    const zTensor = new ort.Tensor('float32', Float32Array.from([z1, z2]), [1, 2]);
+    const results = await session.run({ z: zTensor });
+    const recon = results.x_recon.data;  // Float32Array length 700 (normalized)
+    const prey = [];
+    const predator = [];
+    for (let i = 0; i < recon.length; i++) {
+      const raw = recon[i] * xStd[i] + xMean[i];
+      if (i % 2 === 0) prey.push(raw);
+      else predator.push(raw);
     }
-    if (best) {
-      const label = `Decoded at z = [${best.z[0].toFixed(2)}, ${best.z[1].toFixed(2)}]`;
-      showTrajectory(best.prey, best.predator, label, '#ffd166');
-      moveCrosshair(xScale(best.z[0]), yScale(best.z[1]));
-      clearHighlight();
-    }
+    const label = `Decoded at z = [${z1.toFixed(2)}, ${z2.toFixed(2)}]`;
+    showTrajectory(prey, predator, label, '#ffd166');
+    moveCrosshair(xScale(z1), yScale(z2));
+    clearHighlight();
   }
 
   function moveCrosshair(cx, cy) {
