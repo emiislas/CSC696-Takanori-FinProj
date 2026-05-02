@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Lotka-Volterra VAE Latent Space Explorer</title>
+<title>VAE Latent Space Explorer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
 <style>
@@ -26,12 +26,38 @@
   .grid-cell { cursor: crosshair; }
   .sample-dot { cursor: pointer; }
   .sample-dot:hover { stroke-width: 3px !important; }
+
+  /* ── Switcher (only new CSS) ───────────────────────────────── */
+  .switcher-bar {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 12px;
+  }
+  .switcher-bar button {
+    padding: 6px 20px;
+    background: #16213e;
+    border: 1px solid #2a3a5e;
+    color: #888;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .switcher-bar button:first-child { border-radius: 6px 0 0 6px; }
+  .switcher-bar button:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+  .switcher-bar button.active { background: #a0c4ff; color: #1a1a2e; font-weight: 600; }
 </style>
 </head>
 <body>
 
-<h1>Lotka-Volterra VAE Latent Space Explorer</h1>
+<h1 id="main-title">Lotka-Volterra VAE Latent Space Explorer</h1>
 <p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
+
+<div class="switcher-bar">
+  <button id="btn-lv"  class="active" onclick="switchModel('lv')">Lotka-Volterra</button>
+  <button id="btn-fhn"               onclick="switchModel('fhn')">FitzHugh-Nagumo</button>
+</div>
 
 <div class="container">
   <div class="panel left">
@@ -42,12 +68,12 @@
   </div>
   <div class="right">
     <div class="panel traj-panel">
-      <h2>Prey x<sub>1</sub>(t)</h2>
+      <h2 id="ch1-label">Prey x<sub>1</sub>(t)</h2>
       <div id="prey-plot"></div>
       <div class="decoded-label" id="prey-label"></div>
     </div>
     <div class="panel traj-panel">
-      <h2>Predator x<sub>2</sub>(t)</h2>
+      <h2 id="ch2-label">Predator x<sub>2</sub>(t)</h2>
       <div id="pred-plot"></div>
       <div class="decoded-label" id="pred-label"></div>
     </div>
@@ -60,27 +86,97 @@ const margin = {top: 20, right: 20, bottom: 40, left: 50};
 const tw = 440, th = 160;
 const tm = {top: 10, right: 20, bottom: 30, left: 55};
 
-Promise.all([
-  d3.json('data_for_d3.json'),
-  ort.InferenceSession.create('decoder.onnx'),
-]).then(([data, session]) => {
+const MODELS = {
+  lv: {
+    dataUrl:    'data_for_d3.json',
+    onnxUrl:    'decoder.onnx',
+    title:      'Lotka-Volterra VAE Latent Space Explorer',
+    ch1:        'Prey x<sub>1</sub>(t)',
+    ch2:        'Predator x<sub>2</sub>(t)',
+    paramLabel: '\u03b1',
+    colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
+    precision:  1,
+  },
+  fhn: {
+    dataUrl:    'fhn_data_for_d3.json',
+    onnxUrl:    'fhn_decoder.onnx',
+    title:      'FitzHugh-Nagumo VAE Latent Space Explorer',
+    ch1:        'Membrane voltage v(t)',
+    ch2:        'Recovery variable w(t)',
+    paramLabel: 'a',
+    colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
+    precision:  2,
+  },
+};
+
+let currentModel = 'lv';
+let cache = {};
+
+async function loadModel(id) {
+  if (cache[id]) return;
+  const cfg = MODELS[id];
+  const [data, session] = await Promise.all([
+    d3.json(cfg.dataUrl),
+    ort.InferenceSession.create(cfg.onnxUrl),
+  ]);
+  cache[id] = { data, session };
+}
+
+async function switchModel(id) {
+  if (id === currentModel) return;
+  await loadModel(id);
+  currentModel = id;
+  document.getElementById('btn-lv').classList.toggle('active', id === 'lv');
+  document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
+  render(id);
+}
+
+function render(id) {
+  const cfg = MODELS[id];
+  const { data, session } = cache[id];
   const { samples, x_mean, x_std, meta } = data;
+
+  // Update labels
+  document.getElementById('main-title').textContent = cfg.title;
+  document.getElementById('ch1-label').innerHTML = cfg.ch1;
+  document.getElementById('ch2-label').innerHTML = cfg.ch2;
+
   const xMean = Float32Array.from(x_mean);
-  const xStd = Float32Array.from(x_std);
+  const xStd  = Float32Array.from(x_std);
 
-  // Color scale for alpha
-  const alphaVals = meta.alphas.map(a => +a.toFixed(1));
-  const color = d3.scaleOrdinal()
-    .domain(alphaVals)
-    .range(['#ef476f', '#ffd166', '#06d6a0', '#118ab2']);
+  // Sequential color scale: normalise alpha to [0,1] then apply per-model ramp
+  const alphaVals = meta.alphas.map(a => +a.toFixed(cfg.precision));
+  const alphaMin = d3.min(alphaVals), alphaMax = d3.max(alphaVals);
+  const color = a => cfg.colorScale((a - alphaMin) / (alphaMax - alphaMin));
 
-  // --- Legend ---
+  // Clear previous plots
+  d3.select('#latent-plot').selectAll('*').remove();
+  d3.select('#legend').selectAll('*').remove();
+  d3.select('#prey-plot').selectAll('*').remove();
+  d3.select('#pred-plot').selectAll('*').remove();
+  d3.select('#prey-label').text('');
+  d3.select('#pred-label').text('');
+
+  // --- Legend: gradient bar ---
   const legend = d3.select('#legend');
-  alphaVals.forEach(a => {
-    const item = legend.append('div').attr('class', 'legend-item');
-    item.append('div').attr('class', 'legend-swatch').style('background', color(a));
-    item.append('span').text(`\u03b1 = ${a}`);
-  });
+  const gradId = `grad-${id}`;
+  // build inline SVG gradient legend
+  const stops = alphaVals.map(a => {
+    const t = (a - alphaMin) / (alphaMax - alphaMin);
+    return `<stop offset="${(t * 100).toFixed(1)}%" stop-color="${cfg.colorScale(t)}"/>`;
+  }).join('');
+  legend.html(`
+    <svg width="200" height="36" style="overflow:visible">
+      <defs>
+        <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+          ${stops}
+        </linearGradient>
+      </defs>
+      <text x="0"   y="11" fill="#aaa" font-size="11" text-anchor="start">${cfg.paramLabel} = ${alphaMin}</text>
+      <text x="200" y="11" fill="#aaa" font-size="11" text-anchor="end">${cfg.paramLabel} = ${alphaMax}</text>
+      <rect x="0" y="16" width="200" height="12" rx="3" fill="url(#${gradId})" stroke="#444" stroke-width="0.5"/>
+    </svg>
+  `);
 
   // --- Latent Space Plot ---
   const xScale = d3.scaleLinear().domain(meta.z1_range).range([margin.left, W - margin.right]);
@@ -142,14 +238,16 @@ Promise.all([
     .attr('cx', d => xScale(d.z[0]))
     .attr('cy', d => yScale(d.z[1]))
     .attr('r', 7)
-    .attr('fill', d => color(+d.alpha.toFixed(1)))
+    .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
     .attr('stroke', '#fff')
     .attr('stroke-width', 1.5)
     .attr('opacity', 0.9)
     .on('click', function(event, d) {
       event.stopPropagation();
       highlightDot(this);
-      showTrajectory(d.prey, d.predator, `Sample #${d.id} (\u03b1 = ${d.alpha.toFixed(1)})`, color(+d.alpha.toFixed(1)));
+      showTrajectory(d.prey, d.predator,
+        `Sample #${d.id} (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+        color(+d.alpha.toFixed(cfg.precision)));
       moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
     });
 
@@ -198,18 +296,18 @@ Promise.all([
   const preySvg = makeTrajectoryPlot('#prey-plot');
   const predSvg = makeTrajectoryPlot('#pred-plot');
 
-  function drawLine(svg, values, lineColor, labelEl, label) {
+  function drawLine(svgEl, values, lineColor, labelEl, label) {
     const tVals = values.map((_, i) => i * meta.dt);
     const xS = d3.scaleLinear().domain([0, d3.max(tVals)]).range([tm.left, tw - tm.right]);
     const yS = d3.scaleLinear().domain(d3.extent(values)).nice().range([th - tm.bottom, tm.top]);
 
-    svg.select('.x-axis').call(d3.axisBottom(xS).ticks(5))
+    svgEl.select('.x-axis').call(d3.axisBottom(xS).ticks(5))
       .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
-    svg.select('.y-axis').call(d3.axisLeft(yS).ticks(4))
+    svgEl.select('.y-axis').call(d3.axisLeft(yS).ticks(4))
       .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
 
     const line = d3.line().x((_, i) => xS(tVals[i])).y(d => yS(d));
-    svg.select('.line')
+    svgEl.select('.line')
       .datum(values)
       .attr('d', line)
       .attr('stroke', lineColor);
@@ -225,7 +323,7 @@ Promise.all([
   async function decodeAt(z1, z2) {
     const zTensor = new ort.Tensor('float32', Float32Array.from([z1, z2]), [1, 2]);
     const results = await session.run({ z: zTensor });
-    const recon = results.x_recon.data;  // Float32Array length 700 (normalized)
+    const recon = results.x_recon.data;
     const prey = [];
     const predator = [];
     for (let i = 0; i < recon.length; i++) {
@@ -257,10 +355,15 @@ Promise.all([
   // Show first sample by default
   if (samples.length > 0) {
     const d = samples[0];
-    showTrajectory(d.prey, d.predator, `Sample #0 (\u03b1 = ${d.alpha.toFixed(1)})`, color(+d.alpha.toFixed(1)));
+    showTrajectory(d.prey, d.predator,
+      `Sample #0 (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+      color(+d.alpha.toFixed(cfg.precision)));
     moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
   }
-});
+}
+
+// Boot
+loadModel('lv').then(() => render('lv'));
 </script>
 </body>
 </html>
