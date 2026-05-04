@@ -67,11 +67,25 @@
 - **File:** `run_pipeline.sh` — Added `lotka_volterra_gamma` to all three pipeline steps.
 
 ## 14. Lotka-Volterra β Variant
-- Added a fourth view that varies β (predation rate) with δ tied to β, keeping the system's fixed point constant at (x₁*, x₂*) = (1, 1) regardless of β. This isolates the effect of interaction strength on limit cycle morphology.
-- β ranges over `[0.01, 0.06]` with 20 linearly spaced values. At low β (≈0.01) prey populations swing to ~400× equilibrium in sharp spikes; at high β (≈0.06) oscillations are tight and mild — a qualitatively different waveform shape compared to the α and γ variants, which only scale frequency.
-- Because β governs the nonlinear coupling term β·x₁·x₂ in both equations, the VAE must encode genuinely different trajectory morphologies rather than scaled versions of the same cycle, producing a more structurally interesting latent geometry.
-- **File:** `solve_odes.py` — Added `_lv_beta_rhs` (fixes α=0.4, γ=0.4, sets δ=β) and `lotka_volterra_beta` registry entry outputting `lv_beta_data.pt`.
+- Added a fourth view that varies β (predation rate) only, with δ fixed at 0.02. β ranges over `[0.01, 0.1]` with 20 linearly spaced values.
+- At low β (≈0.01) prey populations swing to large spiky excursions; at high β (≈0.1) oscillations are tight and mild — a qualitatively different waveform shape compared to the α and γ variants, which only scale frequency.
+- **File:** `solve_odes.py` — Added `_lv_beta_rhs` (fixes α=0.4, δ=0.02, γ=0.4, varies β only) and `lotka_volterra_beta` registry entry outputting `lv_beta_data.pt`.
 - **File:** `train_vae.py` — Added `lotka_volterra_beta` registry entry (`vae_lv_beta.pt`).
-- **File:** `export_for_d3.py` — Added `lotka_volterra_beta` registry entry; display betas `[0.01, 0.02, 0.04, 0.06]` with `alpha_precision=2`; outputs `lv_beta_data_for_d3.json` + `lv_beta_decoder.onnx`.
+- **File:** `export_for_d3.py` — Added `lotka_volterra_beta` registry entry; display betas `[0.01, 0.03, 0.06, 0.1]` spanning the full range; outputs `lv_beta_data_for_d3.json` + `lv_beta_decoder.onnx`.
 - **File:** `index.html` — Added "Lotka-Volterra (β)" switcher button with a green colour ramp (hsl 130°); switcher now has four buttons with corrected border-radius CSS.
 - **File:** `run_pipeline.sh` — Added `lotka_volterra_beta` to all three pipeline steps.
+
+## 15. Equation Display with Highlighted Varied Parameter
+- **File:** `index.html` — Added a MathJax-rendered equation panel between the switcher bar and the plots. Each model shows its governing equations with the varied parameter highlighted in gold (`{\color{#ffd166}{...}}`), scoped correctly using TeX grouping braces. Fixed parameter values are listed below the equations. MathJax is re-typeset on every model switch via `MathJax.typesetPromise`.
+- FitzHugh-Nagumo parameter corrected from `α` to `a` throughout (title, legend, equation panel, JS config).
+- FHN colour ramp changed from red to teal (hsl 185°) to visually distinguish it from Lotka-Volterra α.
+
+
+## 16. FitzHugh-Nagumo I Variant
+- Added a fifth model that varies I (external drive current) in the FitzHugh-Nagumo system, the canonical bifurcation parameter in neuroscience. I ranges over `[0.35, 1.5]` — starting just above the Hopf bifurcation so all 20 training trajectories are in the oscillatory regime. Fixed parameters: a=0.7, b=0.8, τ=0.4.
+- Unlike varying `a` (which crosses a bifurcation), this view encodes only spiking frequency and amplitude changes within the oscillatory regime, producing a cleaner 1-D latent manifold.
+- **File:** `solve_odes.py` — Added `_fhn_I_rhs` (fixes a=0.7, b=0.8, τ=0.4, varies I) and `fitzhughnagumo_I` registry entry outputting `fhn_I_data.pt`.
+- **File:** `train_vae.py` — Added `fitzhughnagumo_I` registry entry (`vae_fhn_I.pt`).
+- **File:** `export_for_d3.py` — Added `fitzhughnagumo_I` registry entry; display values `[0.35, 0.6, 0.9, 1.2, 1.5]`; outputs `fhn_I_data_for_d3.json` + `fhn_I_decoder.onnx`.
+- **File:** `index.html` — Added "FitzHugh-Nagumo (I)" switcher button with an orange colour ramp (hsl 30°); equation panel shows I highlighted in the `dv/dt` term.
+- **File:** `run_pipeline.sh` — Added `fitzhughnagumo_I` to all three pipeline steps.

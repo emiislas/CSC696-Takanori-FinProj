@@ -5,6 +5,17 @@
 <title>VAE Latent Space Explorer</title>
 <script src="https://d3js.org/d3.v7.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$','$']],
+      displayMath: [['$$','$$']],
+    },
+    options: { skipHtmlTags: ['script','noscript','style','textarea'] },
+    startup: { typeset: false }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
@@ -48,6 +59,41 @@
   .switcher-bar button:last-child  { border-radius: 0 6px 6px 0; }
   .switcher-bar button:not(:first-child) { border-left: none; }
   .switcher-bar button.active { background: #a0c4ff; color: #1a1a2e; font-weight: 600; }
+
+  /* ── Equation panel ─────────────────────────────────────────── */
+  .eq-panel {
+    background: #16213e;
+    border-radius: 10px;
+    margin: 0 24px 14px;
+    padding: 14px 24px 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .eq-block { flex: 1; min-width: 200px; }
+  .eq-block .eq-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #a0c4ff;
+    margin-bottom: 6px;
+  }
+  .eq-block .eq-body {
+    font-size: 0.92rem;
+    color: #d0d8f0;
+    line-height: 1.9;
+  }
+  .eq-block .eq-body .varied {
+    color: #ffd166;
+    font-weight: 700;
+  }
+  .eq-fixed {
+    font-size: 0.78rem;
+    color: #777;
+    margin-top: 6px;
+    line-height: 1.7;
+  }
 </style>
 </head>
 <body>
@@ -59,8 +105,11 @@
   <button id="btn-lv"       class="active" onclick="switchModel('lv')">Lotka-Volterra (α)</button>
   <button id="btn-lv-gamma"              onclick="switchModel('lv_gamma')">Lotka-Volterra (γ)</button>
   <button id="btn-lv-beta"               onclick="switchModel('lv_beta')">Lotka-Volterra (β)</button>
-  <button id="btn-fhn"                   onclick="switchModel('fhn')">FitzHugh-Nagumo</button>
+  <button id="btn-fhn"                   onclick="switchModel('fhn')">FitzHugh-Nagumo (a)</button>
+  <button id="btn-fhn-I"                 onclick="switchModel('fhn_I')">FitzHugh-Nagumo (I)</button>
 </div>
+
+<div id="eq-panel" class="eq-panel"></div>
 
 <div class="container">
   <div class="panel left">
@@ -99,6 +148,18 @@ const MODELS = {
     paramLabel: '\u03b1',
     colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
     precision:  1,
+    eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-body">
+          $\\dfrac{dx_1}{dt} = {\\color{#ffd166}{\\alpha}}\\, x_1 - \\beta\\, x_1 x_2$<br>
+          $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - \\gamma\\, x_2$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">α (prey growth rate)</span> &ensp;∈ [0.1, 0.8]<br>
+          Fixed: β = δ = 0.02,&ensp;γ = 0.4,&ensp;x₀ = (10, 10)
+        </div>
+      </div>`,
   },
   lv_gamma: {
     dataUrl:    'lv_gamma_data_for_d3.json',
@@ -109,6 +170,18 @@ const MODELS = {
     paramLabel: '\u03b3',
     colorScale: t => d3.hsl(260, 0.7 + t * 0.3, 0.8 - t * 0.5).toString(),
     precision:  1,
+    eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-body">
+          $\\dfrac{dx_1}{dt} = \\alpha\\, x_1 - \\beta\\, x_1 x_2$<br>
+          $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - {\\color{#ffd166}{\\gamma}}\\, x_2$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">γ (predator death rate)</span> &ensp;∈ [0.1, 0.8]<br>
+          Fixed: α = 0.4,&ensp;β = δ = 0.02,&ensp;x₀ = (10, 10)
+        </div>
+      </div>`,
   },
   lv_beta: {
     dataUrl:    'lv_beta_data_for_d3.json',
@@ -119,16 +192,62 @@ const MODELS = {
     paramLabel: '\u03b2',
     colorScale: t => d3.hsl(130, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
     precision:  2,
+    eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-body">
+          $\\dfrac{dx_1}{dt} = \\alpha\\, x_1 - {\\color{#ffd166}{\\beta}}\\, x_1 x_2$<br>
+          $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - \\gamma\\, x_2$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">β (predation rate)</span> &ensp;∈ [0.01, 0.1]<br>
+          Fixed: α = 0.4,&ensp;δ = 0.02,&ensp;γ = 0.4,&ensp;x₀ = (10, 10)
+        </div>
+      </div>`,
   },
   fhn: {
     dataUrl:    'fhn_data_for_d3.json',
     onnxUrl:    'fhn_decoder.onnx',
-    title:      'FitzHugh-Nagumo VAE Latent Space Explorer',
+    title:      'FitzHugh-Nagumo VAE Latent Space Explorer (a varies)',
     ch1:        'Membrane voltage v(t)',
     ch2:        'Recovery variable w(t)',
     paramLabel: 'a',
-    colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
+    colorScale: t => d3.hsl(185, 0.5 + t * 0.5, 0.75 - t * 0.4).toString(),
     precision:  2,
+    eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Governing equations — FitzHugh-Nagumo</div>
+        <div class="eq-body">
+          $\\dfrac{dv}{dt} = v - \\dfrac{v^3}{3} - w + I$<br>
+          $\\dfrac{dw}{dt} = \\tau\\left(v + {\\color{#ffd166}{a}} - b\\,w\\right)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">a (recovery bias / excitability)</span> &ensp;∈ [0.10, 0.70]<br>
+          Fixed: b = 0.8,&ensp;τ = 0.4,&ensp;I = 0.5,&ensp;(v₀, w₀) = (0, 0)
+        </div>
+      </div>`,
+  },
+  fhn_I: {
+    dataUrl:    'fhn_I_data_for_d3.json',
+    onnxUrl:    'fhn_I_decoder.onnx',
+    title:      'FitzHugh-Nagumo VAE Latent Space Explorer (I varies)',
+    ch1:        'Membrane voltage v(t)',
+    ch2:        'Recovery variable w(t)',
+    paramLabel: 'I',
+    colorScale: t => d3.hsl(30, 0.5 + t * 0.5, 0.8 - t * 0.45).toString(),
+    precision:  2,
+    eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Governing equations — FitzHugh-Nagumo</div>
+        <div class="eq-body">
+          $\\dfrac{dv}{dt} = v - \\dfrac{v^3}{3} - w + {\\color{#ffd166}{I}}$<br>
+          $\\dfrac{dw}{dt} = \\tau\\left(v + a - b\\,w\\right)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">I (external drive current)</span> &ensp;∈ [0.35, 1.5] — all values above Hopf bifurcation<br>
+          Fixed: a = 0.7,&ensp;b = 0.8,&ensp;τ = 0.4,&ensp;(v₀, w₀) = (0, 0)
+        </div>
+      </div>`,
   },
 };
 
@@ -153,6 +272,7 @@ async function switchModel(id) {
   document.getElementById('btn-lv-gamma').classList.toggle('active', id === 'lv_gamma');
   document.getElementById('btn-lv-beta').classList.toggle('active', id === 'lv_beta');
   document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
+  document.getElementById('btn-fhn-I').classList.toggle('active', id === 'fhn_I');
   render(id);
 }
 
@@ -165,6 +285,13 @@ function render(id) {
   document.getElementById('main-title').textContent = cfg.title;
   document.getElementById('ch1-label').innerHTML = cfg.ch1;
   document.getElementById('ch2-label').innerHTML = cfg.ch2;
+
+  // Update equation panel and re-typeset MathJax
+  const eqPanel = document.getElementById('eq-panel');
+  eqPanel.innerHTML = cfg.eqHtml;
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([eqPanel]).catch(err => console.warn('MathJax error', err));
+  }
 
   const xMean = Float32Array.from(x_mean);
   const xStd  = Float32Array.from(x_std);
@@ -387,7 +514,12 @@ function render(id) {
   }
 }
 
-// Boot
+// Boot — show equations immediately, then load data
+const eqPanel = document.getElementById('eq-panel');
+eqPanel.innerHTML = MODELS['lv'].eqHtml;
+if (window.MathJax && MathJax.typesetPromise) {
+  MathJax.typesetPromise([eqPanel]).catch(() => {});
+}
 loadModel('lv').then(() => render('lv'));
 </script>
 </body>
