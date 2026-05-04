@@ -31,7 +31,7 @@ MODELS = {
         weights         = 'vae_lv_beta.pt',
         json_out        = 'lv_beta_data_for_d3.json',
         onnx_out        = 'lv_beta_decoder.onnx',
-        display_alphas  = [0.01, 0.02, 0.04, 0.06],
+        display_alphas  = [0.01, 0.03, 0.06, 0.1],
         alpha_precision = 2,
         ch1_key         = 'prey',
         ch2_key         = 'predator',
@@ -53,8 +53,18 @@ MODELS = {
         onnx_out       = 'fhn_decoder.onnx',
         display_alphas = [0.1, 0.3, 0.5, 0.7],
         alpha_precision = 2,
-        ch1_key        = 'prey',      # reuse keys so index.html needs no change
+        ch1_key        = 'prey',
         ch2_key        = 'predator',
+    ),
+    'fitzhughnagumo_I': dict(
+        data_file       = 'fhn_I_data.pt',
+        weights         = 'vae_fhn_I.pt',
+        json_out        = 'fhn_I_data_for_d3.json',
+        onnx_out        = 'fhn_I_decoder.onnx',
+        display_alphas  = [0.35, 0.6, 0.9, 1.2, 1.5],
+        alpha_precision = 2,
+        ch1_key         = 'prey',
+        ch2_key         = 'predator',
     ),
 }
 

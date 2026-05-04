@@ -40,6 +40,12 @@ MODELS = {
         loss_plot  = 'vae_loss_curve_fitzhughnagumo.png',
         plot_title = 'VAE Training Loss — FitzHugh-Nagumo',
     ),
+    'fitzhughnagumo_I': dict(
+        data_file  = 'fhn_I_data.pt',
+        weights    = 'vae_fhn_I.pt',
+        loss_plot  = 'vae_loss_curve_fhn_I.png',
+        plot_title = 'VAE Training Loss — FitzHugh-Nagumo (I varies)',
+    ),
 }
 
 # ── Training ──────────────────────────────────────────────────────────────────

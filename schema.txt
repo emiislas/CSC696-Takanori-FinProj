@@ -8,12 +8,13 @@ Multiple ODE systems and parameter choices are supported through a shared regist
 
 ## 2. Supported Models
 
-| Model key               | ODE system        | Varied parameter | Fixed parameters                        | Output files                                        |
-|-------------------------|-------------------|------------------|-----------------------------------------|-----------------------------------------------------|
-| `lotka_volterra`        | Lotka-Volterra    | α (prey growth)  | β=δ=0.02, γ=0.4                        | `predator_prey_data.pt`, `vae_lotkavolt.pt`         |
-| `lotka_volterra_gamma`  | Lotka-Volterra    | γ (pred. death)  | α=0.4, β=δ=0.02                        | `lv_gamma_data.pt`, `vae_lv_gamma.pt`               |
-| `lotka_volterra_beta`   | Lotka-Volterra    | β=δ (coupling)   | α=0.4, γ=0.4                           | `lv_beta_data.pt`, `vae_lv_beta.pt`                 |
-| `fitzhughnagumo`        | FitzHugh-Nagumo   | a (recovery bias)| b=0.8, τ=0.4, I=0.5                    | `fitzhughnagumo_data.pt`, `vae_fitzhughnagumo.pt`   |
+| Model key              | ODE system      | Varied parameter       | Fixed parameters                   | Output files                                            |
+|------------------------|-----------------|------------------------|------------------------------------|---------------------------------------------------------|
+| `lotka_volterra`       | Lotka-Volterra  | α (prey growth rate)   | β=0.02, δ=0.02, γ=0.4             | `predator_prey_data.pt`, `vae_lotkavolt.pt`             |
+| `lotka_volterra_gamma` | Lotka-Volterra  | γ (predator death rate)| α=0.4, β=0.02, δ=0.02             | `lv_gamma_data.pt`, `vae_lv_gamma.pt`                   |
+| `lotka_volterra_beta`  | Lotka-Volterra  | β (predation rate)     | α=0.4, δ=0.02, γ=0.4             | `lv_beta_data.pt`, `vae_lv_beta.pt`                     |
+| `fitzhughnagumo`       | FitzHugh-Nagumo | a (recovery bias)      | b=0.8, τ=0.4, I=0.5               | `fitzhughnagumo_data.pt`, `vae_fitzhughnagumo.pt`       |
+| `fitzhughnagumo_I`     | FitzHugh-Nagumo | I (external current)   | a=0.7, b=0.8, τ=0.4               | `fhn_I_data.pt`, `vae_fhn_I.pt`                         |
 
 ## 3. Governing Equations
 
@@ -29,7 +30,7 @@ Fixed point: x₁* = γ/δ, x₂* = α/β. Oscillation frequency: ω = √(αγ)
 **Parameter notes:**
 - Varying **α** scales oscillation frequency and prey equilibrium; produces amplitude/frequency shifts.
 - Varying **γ** has the same qualitative effect as α (both appear linearly in ω and the fixed-point equations), making the two latent spaces structurally similar. Retained for pedagogical comparison.
-- Varying **β** (with δ tied to β) keeps the fixed point constant at (x₁*, x₂*) = (1, 1) and only changes the nonlinear coupling strength. This alters limit cycle *morphology* — low β gives large spiky excursions (prey reaching ~400×), high β gives tight mild oscillations — producing qualitatively different waveform shapes and a more structurally interesting latent geometry than the α/γ variants.
+- Varying **β** only (δ fixed at 0.02) changes the predation coupling strength while leaving the predator death term unchanged. Unlike the original β=δ design, the fixed point is no longer pinned at (1,1) and shifts with β, so the VAE encodes both frequency and equilibrium changes simultaneously.
 
 ### FitzHugh-Nagumo
 
@@ -38,48 +39,53 @@ dv/dt = v − v³/3 − w + I
 dw/dt = τ·(v + a − b·w)
 ```
 
-### Parameter Ranges
+**Parameter notes:**
+- Varying **a** shifts the w-nullcline vertically, moving the fixed point along the cubic v-nullcline. At low a the system oscillates tonically; near the Hopf bifurcation (~a ≈ 0.4 with these parameters) small-amplitude oscillations emerge; at high a the system is quiescent/excitable. The topology of the dynamics changes, making this richer than a pure frequency sweep.
+- Varying **I** shifts the entire v-nullcline vertically. I is the canonical bifurcation parameter in neuroscience (injected current). The training range [0.35, 1.5] is chosen to stay entirely above the Hopf bifurcation so all trajectories are oscillatory; the VAE then encodes spiking frequency and amplitude changes across the range.
 
-| Model key              | Parameter | Range                        | N values |
-|------------------------|-----------|------------------------------|----------|
-| `lotka_volterra`       | α         | [0.1, 0.8] linspace          | 20       |
-| `lotka_volterra_gamma` | γ         | [0.1, 0.8] linspace          | 20       |
-| `lotka_volterra_beta`  | β (=δ)    | [0.01, 0.06] linspace        | 20       |
-| `fitzhughnagumo`       | a         | [0.10, 0.70] linspace        | 20       |
+## 4. Parameter Ranges
 
-## 4. Initial Conditions
+| Model key              | Parameter | Range                 | N values |
+|------------------------|-----------|-----------------------|----------|
+| `lotka_volterra`       | α         | [0.1, 0.8] linspace   | 20       |
+| `lotka_volterra_gamma` | γ         | [0.1, 0.8] linspace   | 20       |
+| `lotka_volterra_beta`  | β         | [0.01, 0.1] linspace  | 20       |
+| `fitzhughnagumo`       | a         | [0.10, 0.70] linspace | 20       |
+| `fitzhughnagumo_I`     | I         | [0.35, 1.5] linspace  | 20       |
 
-| Model                  | y₀            |
-|------------------------|---------------|
-| Lotka-Volterra (all)   | [10.0, 10.0]  |
-| FitzHugh-Nagumo        | [0.0, 0.0]    |
+## 5. Initial Conditions
+
+| Model                    | y₀           |
+|--------------------------|--------------|
+| Lotka-Volterra (all)     | [10.0, 10.0] |
+| FitzHugh-Nagumo (both)   | [0.0, 0.0]   |
 
 Same initial conditions across all parameter values so the only source of variation between trajectories is the varied parameter.
 
-## 5. Numerical Integration
+## 6. Numerical Integration
 
-| Setting    | Value                          |
-|------------|--------------------------------|
-| Solver     | `solve_ivp` (RK45)             |
-| Time span  | [0, 100]                       |
-| dt         | 0.1                            |
-| Time steps | 1000                           |
-| rtol/atol  | 1e-10                          |
+| Setting    | Value              |
+|------------|--------------------|
+| Solver     | `solve_ivp` (RK45) |
+| Time span  | [0, 100]           |
+| dt         | 0.1                |
+| Time steps | 1000               |
+| rtol/atol  | 1e-10              |
 
-## 6. Windowing
+## 7. Windowing
 
-| Setting              | Value                                      |
-|----------------------|--------------------------------------------|
-| Window size          | 350 time steps (= 35.0 time units)        |
-| Sampling method      | Sequential windows with a fixed shift      |
-| Windows per trajectory | 40                                       |
-| Total samples        | 800 (20 parameter values × 40 windows)    |
-| Input shape          | (350, 2) flattened to (700,)               |
-| Shift per window     | 4% of window size (14 time steps)          |
+| Setting                | Value                                   |
+|------------------------|-----------------------------------------|
+| Window size            | 350 time steps (= 35.0 time units)      |
+| Sampling method        | Sequential windows with a fixed shift   |
+| Windows per trajectory | 40                                      |
+| Total samples          | 800 (20 parameter values × 40 windows) |
+| Input shape            | (350, 2) flattened to (700,)            |
+| Shift per window       | 4% of window size (14 time steps)       |
 
 Sequential (rather than random) windowing produces more uniform coverage of the latent space.
 
-## 7. Normalisation
+## 8. Normalisation
 
 Per-feature standardisation across the full dataset:
 
@@ -89,7 +95,7 @@ x_norm = (x − x_mean) / (x_std + 1e-8)
 
 `x_mean` and `x_std` (shape 700) are saved in the `.pt` file and included in the exported JSON for in-browser denormalisation.
 
-## 8. VAE Architecture
+## 9. VAE Architecture
 
 **Encoder:**
 ```
@@ -113,59 +119,61 @@ Linear(128 → 256)        → BatchNorm1d → Tanh
 Linear(256 → 700)        (no activation)
 ```
 
-## 9. Training Configuration
+## 10. Training Configuration
 
-| Setting              | Value                                         |
-|----------------------|-----------------------------------------------|
-| Latent dim           | 2                                             |
-| Batch size           | 64                                            |
-| Epochs               | 500                                           |
-| Learning rate        | 1e-3                                          |
-| Optimizer            | Adam (weight_decay=1e-8)                      |
-| Scheduler            | ReduceLROnPlateau (factor=0.5, patience=5)    |
-| Train/val split      | 80/20                                         |
-| β (KL weight)        | 0.01                                           |
-| β annealing          | Linear ramp 0 → β over first 50 epochs        |
+| Setting         | Value                                      |
+|-----------------|--------------------------------------------|
+| Latent dim      | 2                                          |
+| Batch size      | 64                                         |
+| Epochs          | 500                                        |
+| Learning rate   | 1e-3                                       |
+| Optimizer       | Adam (weight_decay=1e-8)                   |
+| Scheduler       | ReduceLROnPlateau (factor=0.5, patience=5) |
+| Train/val split | 80/20                                      |
+| β (KL weight)   | 0.01                                       |
+| β annealing     | Linear ramp 0 → β over first 50 epochs     |
 
-## 10. Loss Function
+## 11. Loss Function
 
 ```
 ELBO = MSE(x_recon, x) + β_current · KL
 KL   = −0.5 · mean(1 + log_var − μ² − exp(log_var))
 ```
 
-## 11. Export & Visualisation
+## 12. Export & Visualisation
 
 After training, `export_for_d3.py` produces two artefacts per model:
 
 - **`<model>_data_for_d3.json`** — encoded latent coordinates (μ) for a filtered subset of display parameter values, raw trajectory data for those samples, `x_mean`/`x_std` for denormalisation, and axis range metadata.
 - **`<model>_decoder.onnx`** — the decoder subnetwork exported via `torch.onnx.export` (opset 14, dynamic batch axis), loaded in the browser via `onnxruntime-web`.
 
-The frontend (`index.html`) lazy-loads each model's JSON + ONNX session on first use and caches them for instant re-switching. Clicking empty latent space runs a live in-browser decoder inference at the clicked (z₁, z₂) coordinate.
+The frontend (`index.html`) lazy-loads each model's JSON + ONNX session on first use and caches them for instant re-switching. Clicking empty latent space runs a live in-browser decoder inference at the clicked (z₁, z₂) coordinate. Each model's panel displays the governing equations with the varied parameter highlighted, rendered via MathJax.
 
 ### Display Parameter Subsets
 
-Training uses 20 parameter values; the visualiser filters down to 4 representative values per model to keep the scatter plot readable:
+Training uses 20 parameter values; the visualiser filters down to a representative subset per model to keep the scatter plot readable:
 
-| Model key              | Displayed values          |
-|------------------------|---------------------------|
-| `lotka_volterra`       | α ∈ {0.1, 0.4, 0.6, 0.8} |
-| `lotka_volterra_gamma` | γ ∈ {0.1, 0.3, 0.5, 0.7} |
-| `lotka_volterra_beta`  | β ∈ {0.01, 0.02, 0.04, 0.06} |
-| `fitzhughnagumo`       | a ∈ {0.1, 0.3, 0.5, 0.7} |
+| Model key              | Displayed values                  |
+|------------------------|-----------------------------------|
+| `lotka_volterra`       | α ∈ {0.1, 0.4, 0.6, 0.8}         |
+| `lotka_volterra_gamma` | γ ∈ {0.1, 0.3, 0.5, 0.7}         |
+| `lotka_volterra_beta`  | β ∈ {0.01, 0.03, 0.06, 0.1}      |
+| `fitzhughnagumo`       | a ∈ {0.1, 0.3, 0.5, 0.7}         |
+| `fitzhughnagumo_I`     | I ∈ {0.35, 0.6, 0.9, 1.2, 1.5}   |
 
 ### Colour Ramps
 
 Each model uses a distinct hue to make the switcher views immediately distinguishable:
 
-| Model key              | Colour ramp     |
-|------------------------|-----------------|
-| `lotka_volterra`       | Red             |
-| `lotka_volterra_gamma` | Purple (hsl 260°) |
-| `lotka_volterra_beta`  | Green (hsl 130°)  |
-| `fitzhughnagumo`       | Red             |
+| Model key              | Colour ramp        |
+|------------------------|--------------------|
+| `lotka_volterra`       | Red (hsl 0°)       |
+| `lotka_volterra_gamma` | Purple (hsl 260°)  |
+| `lotka_volterra_beta`  | Green (hsl 130°)   |
+| `fitzhughnagumo`       | Teal (hsl 185°)    |
+| `fitzhughnagumo_I`     | Orange (hsl 30°)   |
 
-## 12. Pipeline
+## 13. Pipeline
 
 All steps are driven by a `--model` flag; adding a new ODE/parameter combination only requires adding one registry entry to each of the three Python scripts.
 
@@ -176,8 +184,18 @@ python3 export_for_d3.py --model <key>
 python3 -m http.server 8000
 ```
 
-`run_pipeline.sh` runs all four models sequentially then starts the HTTP server.
+`run_pipeline.sh` runs all five models sequentially then starts the HTTP server.
 
-## 13. Latent Space Assumptions
+## 14. Latent Space Assumptions
 
 The VAE discovers axis-to-parameter correspondence without supervision. After training, the parameter-correlated axis can be identified via Pearson correlation between each latent dimension and the known parameter labels. With 2-D latent spaces the structure is typically a 1-D curve or arc whose position along the manifold tracks the varied parameter monotonically.
+
+### Expected Latent Geometry by Model
+
+| Model key              | Expected structure                                                                 |
+|------------------------|------------------------------------------------------------------------------------|
+| `lotka_volterra`       | 1-D arc; position tracks α monotonically (frequency/amplitude scaling)             |
+| `lotka_volterra_gamma` | Structurally similar to α variant; same ω=√(αγ) dependence                        |
+| `lotka_volterra_beta`  | 1-D arc encoding both frequency and equilibrium shift as β moves independently of δ|
+| `fitzhughnagumo`       | 1-D manifold crossing a Hopf bifurcation; one end oscillatory, other quiescent     |
+| `fitzhughnagumo_I`     | 1-D arc entirely within oscillatory regime; encodes spiking frequency and amplitude|
