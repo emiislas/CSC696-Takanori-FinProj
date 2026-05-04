@@ -45,7 +45,8 @@
     transition: background 0.2s, color 0.2s;
   }
   .switcher-bar button:first-child { border-radius: 6px 0 0 6px; }
-  .switcher-bar button:last-child  { border-radius: 0 6px 6px 0; border-left: none; }
+  .switcher-bar button:last-child  { border-radius: 0 6px 6px 0; }
+  .switcher-bar button:not(:first-child) { border-left: none; }
   .switcher-bar button.active { background: #a0c4ff; color: #1a1a2e; font-weight: 600; }
 </style>
 </head>
@@ -55,8 +56,10 @@
 <p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
 
 <div class="switcher-bar">
-  <button id="btn-lv"  class="active" onclick="switchModel('lv')">Lotka-Volterra</button>
-  <button id="btn-fhn"               onclick="switchModel('fhn')">FitzHugh-Nagumo</button>
+  <button id="btn-lv"       class="active" onclick="switchModel('lv')">Lotka-Volterra (α)</button>
+  <button id="btn-lv-gamma"              onclick="switchModel('lv_gamma')">Lotka-Volterra (γ)</button>
+  <button id="btn-lv-beta"               onclick="switchModel('lv_beta')">Lotka-Volterra (β)</button>
+  <button id="btn-fhn"                   onclick="switchModel('fhn')">FitzHugh-Nagumo</button>
 </div>
 
 <div class="container">
@@ -90,12 +93,32 @@ const MODELS = {
   lv: {
     dataUrl:    'data_for_d3.json',
     onnxUrl:    'decoder.onnx',
-    title:      'Lotka-Volterra VAE Latent Space Explorer',
+    title:      'Lotka-Volterra VAE Latent Space Explorer (α varies)',
     ch1:        'Prey x<sub>1</sub>(t)',
     ch2:        'Predator x<sub>2</sub>(t)',
     paramLabel: '\u03b1',
     colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
     precision:  1,
+  },
+  lv_gamma: {
+    dataUrl:    'lv_gamma_data_for_d3.json',
+    onnxUrl:    'lv_gamma_decoder.onnx',
+    title:      'Lotka-Volterra VAE Latent Space Explorer (\u03b3 varies)',
+    ch1:        'Prey x<sub>1</sub>(t)',
+    ch2:        'Predator x<sub>2</sub>(t)',
+    paramLabel: '\u03b3',
+    colorScale: t => d3.hsl(260, 0.7 + t * 0.3, 0.8 - t * 0.5).toString(),
+    precision:  1,
+  },
+  lv_beta: {
+    dataUrl:    'lv_beta_data_for_d3.json',
+    onnxUrl:    'lv_beta_decoder.onnx',
+    title:      'Lotka-Volterra VAE Latent Space Explorer (\u03b2 varies)',
+    ch1:        'Prey x<sub>1</sub>(t)',
+    ch2:        'Predator x<sub>2</sub>(t)',
+    paramLabel: '\u03b2',
+    colorScale: t => d3.hsl(130, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+    precision:  2,
   },
   fhn: {
     dataUrl:    'fhn_data_for_d3.json',
@@ -127,6 +150,8 @@ async function switchModel(id) {
   await loadModel(id);
   currentModel = id;
   document.getElementById('btn-lv').classList.toggle('active', id === 'lv');
+  document.getElementById('btn-lv-gamma').classList.toggle('active', id === 'lv_gamma');
+  document.getElementById('btn-lv-beta').classList.toggle('active', id === 'lv_beta');
   document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
   render(id);
 }

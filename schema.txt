@@ -1,123 +1,183 @@
-# Project Schema: Learning Latent Representations of Predator-Prey Dynamics with a VAE
+# Project Schema: Learning Latent Representations of ODE Dynamics with a VAE
 
 ## 1. Idea
 
-Train a Variational Autoencoder on windowed trajectory data from the solution of a simple parametarized ODE equation. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the parameters of the ODE e.g. \alpha, and \beta of a lotka-volterra model. Once trained, sweeping through the latent space should produce a continuous visualisation of how the predator-prey dynamics change with each parameter.
+Train a Variational Autoencoder on windowed trajectory data from the numerical solution of parametrized ODE systems. The goal is for the VAE to discover, without supervision, a low-dimensional latent space whose axes correspond to physically meaningful quantities — specifically the varied parameter of each ODE. Once trained, sweeping through the latent space produces a continuous visualisation of how the dynamics change with each parameter.
 
-## 2. Governing Equations
+Multiple ODE systems and parameter choices are supported through a shared registry-driven pipeline. Each combination of (ODE system, varied parameter) is treated as an independent model with its own data, weights, and exported artefacts, but all share the same VAE architecture, training loop, and frontend visualiser.
 
-Lotka-Volterra system
+## 2. Supported Models
 
-## 3. Fixed Parameters
+| Model key               | ODE system        | Varied parameter | Fixed parameters                        | Output files                                        |
+|-------------------------|-------------------|------------------|-----------------------------------------|-----------------------------------------------------|
+| `lotka_volterra`        | Lotka-Volterra    | α (prey growth)  | β=δ=0.02, γ=0.4                        | `predator_prey_data.pt`, `vae_lotkavolt.pt`         |
+| `lotka_volterra_gamma`  | Lotka-Volterra    | γ (pred. death)  | α=0.4, β=δ=0.02                        | `lv_gamma_data.pt`, `vae_lv_gamma.pt`               |
+| `lotka_volterra_beta`   | Lotka-Volterra    | β=δ (coupling)   | α=0.4, γ=0.4                           | `lv_beta_data.pt`, `vae_lv_beta.pt`                 |
+| `fitzhughnagumo`        | FitzHugh-Nagumo   | a (recovery bias)| b=0.8, τ=0.4, I=0.5                    | `fitzhughnagumo_data.pt`, `vae_fitzhughnagumo.pt`   |
 
-| Symbol | Value     | Role                  |
-|--------|-----------|-----------------------|
-| α      | 0.4       | Prey growth rate      |
-| β      | 0.02      | Predation rate        |
-| γ      | 0.4       | Predator death rate   |
-| δ      | 0.02      | Predator growth rate  |
+## 3. Governing Equations
 
-For the first tests only one parameter varies, while the other's stay static
-
-
-## 4. Varied Parameter
-
-| Symbol | Values             | Role                |
-|--------|--------------------|---------------------|
-|  α     | [0.1, 0.4, 0.6, 0.8] | Prey Growth rate  |
-
-Physical interpretation: as alpha increases, the environment supports a larger prey population growth.
-
-## 5. Initial Conditions
-
-| Variable | Value |
-|----------|-------|
-| x₁(0)   | 10    |
-| x₂(0)   | 10    |
-
-Same for all trajectories so the only source of variation between trajectories is α.
-
-## 6. Numerical Integration
-
-| Setting       | Value    |
-|---------------|----------|
-| Solver        | `solve_ivp` (default RK45) |
-| Time span     | [0, 100] |
-| dt            | 0.1      |
-| Time steps    | 1000     |
-| rtol          | 1e-10    |
-| atol          | 1e-10    |
-
-## 7. Windowing
-
-| Setting              | Value                                  |
-|----------------------|----------------------------------------|
-| Window size          | 350 time steps (= 35.0 time units)    |
-| Sampling method      | Sequential windows with a shift       |
-| Samples per trajectory | 40                                    |
-| Total samples        | 20 (4 α values × 5 samples)           |
-| Input shape          | (350, 2) flattened to (700,)           |
-
-Each training sample is a sequential placed segment of one trajectory containing both x₁ and x₂ from the same time window.
-
-## 8. Normalization
-
-Per-feature (per column of the flattened window) standardization:
+### Lotka-Volterra
 
 ```
-x_norm = (x - x_mean) / (x_std + 1e-8)
+dx₁/dt =  α·x₁ − β·x₁·x₂
+dx₂/dt =  δ·x₁·x₂ − γ·x₂
 ```
 
-The mean and std are computed over the entire dataset and saved alongside the data for denormalization at decode time.
+Fixed point: x₁* = γ/δ, x₂* = α/β. Oscillation frequency: ω = √(αγ).
 
-## 9. VAE Architecture
+**Parameter notes:**
+- Varying **α** scales oscillation frequency and prey equilibrium; produces amplitude/frequency shifts.
+- Varying **γ** has the same qualitative effect as α (both appear linearly in ω and the fixed-point equations), making the two latent spaces structurally similar. Retained for pedagogical comparison.
+- Varying **β** (with δ tied to β) keeps the fixed point constant at (x₁*, x₂*) = (1, 1) and only changes the nonlinear coupling strength. This alters limit cycle *morphology* — low β gives large spiky excursions (prey reaching ~400×), high β gives tight mild oscillations — producing qualitatively different waveform shapes and a more structurally interesting latent geometry than the α/γ variants.
 
-**Encoder (shared):**
+### FitzHugh-Nagumo
+
 ```
-Linear(700 → 128) → BatchNorm → TanH
-Linear(128 → 64)  → BatchNorm → TanH
+dv/dt = v − v³/3 − w + I
+dw/dt = τ·(v + a − b·w)
 ```
 
-**Encoder heads:**
+### Parameter Ranges
+
+| Model key              | Parameter | Range                        | N values |
+|------------------------|-----------|------------------------------|----------|
+| `lotka_volterra`       | α         | [0.1, 0.8] linspace          | 20       |
+| `lotka_volterra_gamma` | γ         | [0.1, 0.8] linspace          | 20       |
+| `lotka_volterra_beta`  | β (=δ)    | [0.01, 0.06] linspace        | 20       |
+| `fitzhughnagumo`       | a         | [0.10, 0.70] linspace        | 20       |
+
+## 4. Initial Conditions
+
+| Model                  | y₀            |
+|------------------------|---------------|
+| Lotka-Volterra (all)   | [10.0, 10.0]  |
+| FitzHugh-Nagumo        | [0.0, 0.0]    |
+
+Same initial conditions across all parameter values so the only source of variation between trajectories is the varied parameter.
+
+## 5. Numerical Integration
+
+| Setting    | Value                          |
+|------------|--------------------------------|
+| Solver     | `solve_ivp` (RK45)             |
+| Time span  | [0, 100]                       |
+| dt         | 0.1                            |
+| Time steps | 1000                           |
+| rtol/atol  | 1e-10                          |
+
+## 6. Windowing
+
+| Setting              | Value                                      |
+|----------------------|--------------------------------------------|
+| Window size          | 350 time steps (= 35.0 time units)        |
+| Sampling method      | Sequential windows with a fixed shift      |
+| Windows per trajectory | 40                                       |
+| Total samples        | 800 (20 parameter values × 40 windows)    |
+| Input shape          | (350, 2) flattened to (700,)               |
+| Shift per window     | 4% of window size (14 time steps)          |
+
+Sequential (rather than random) windowing produces more uniform coverage of the latent space.
+
+## 7. Normalisation
+
+Per-feature standardisation across the full dataset:
+
 ```
+x_norm = (x − x_mean) / (x_std + 1e-8)
+```
+
+`x_mean` and `x_std` (shape 700) are saved in the `.pt` file and included in the exported JSON for in-browser denormalisation.
+
+## 8. VAE Architecture
+
+**Encoder:**
+```
+Linear(700 → 256) → BatchNorm1d → Tanh
+Linear(256 → 128) → BatchNorm1d → Tanh
+Linear(128 → 64)  → BatchNorm1d → Tanh
 fc_mu:      Linear(64 → latent_dim)
 fc_log_var: Linear(64 → latent_dim)
 ```
 
-**Reparameterization:**
+**Reparameterisation:**
 ```
-z = μ + ε·exp(0.5·log_var),  ε ~ N(0, I)
+z = μ + ε · exp(0.5 · log_var),   ε ~ N(0, I)
 ```
 
 **Decoder:**
 ```
-Linear(latent_dim → 64)  → BatchNorm → TanH
-Linear(64 → 128)         → BatchNorm → TanH
-Linear(128 → 700)        (no activation — data is unbounded after normalization)
+Linear(latent_dim → 64)  → BatchNorm1d → Tanh
+Linear(64 → 128)         → BatchNorm1d → Tanh
+Linear(128 → 256)        → BatchNorm1d → Tanh
+Linear(256 → 700)        (no activation)
 ```
 
-## 10. Training Configuration
+## 9. Training Configuration
 
-| Setting         | Value   |
-|-----------------|---------|
-| Latent dim      | 3       |
-| Batch size      | 64      |
-| Epochs          | 100     |
-| Learning rate   | 1e-3    |
-| Optimizer       | Adam (weight_decay=1e-8) |
-| Scheduler       | ReduceLROnPlateau (factor=0.5, patience=5) |
-| Train/val split | 80/20   |
-| Beta (KL weight)| 1.0 (reduce to 0.1–0.5 if posterior collapse occurs) |
+| Setting              | Value                                         |
+|----------------------|-----------------------------------------------|
+| Latent dim           | 2                                             |
+| Batch size           | 64                                            |
+| Epochs               | 500                                           |
+| Learning rate        | 1e-3                                          |
+| Optimizer            | Adam (weight_decay=1e-8)                      |
+| Scheduler            | ReduceLROnPlateau (factor=0.5, patience=5)    |
+| Train/val split      | 80/20                                         |
+| β (KL weight)        | 0.01                                           |
+| β annealing          | Linear ramp 0 → β over first 50 epochs        |
 
-## 11. Loss Function
-
-ELBO = Reconstruction + β · KL divergence
+## 10. Loss Function
 
 ```
-Reconstruction: MSE(x_recon, x)
-KL:            -0.5 · mean(1 + log_var - μ² - exp(log_var))
+ELBO = MSE(x_recon, x) + β_current · KL
+KL   = −0.5 · mean(1 + log_var − μ² − exp(log_var))
 ```
 
-## 12. Latent Space Assumptions
+## 11. Export & Visualisation
 
-The assignment of roles to specific dimensions is not enforced — the VAE discovers it. After training, we identify the parameter-correlated axis via Pearson correlation between each latent dimension and the known parameter labels.
+After training, `export_for_d3.py` produces two artefacts per model:
+
+- **`<model>_data_for_d3.json`** — encoded latent coordinates (μ) for a filtered subset of display parameter values, raw trajectory data for those samples, `x_mean`/`x_std` for denormalisation, and axis range metadata.
+- **`<model>_decoder.onnx`** — the decoder subnetwork exported via `torch.onnx.export` (opset 14, dynamic batch axis), loaded in the browser via `onnxruntime-web`.
+
+The frontend (`index.html`) lazy-loads each model's JSON + ONNX session on first use and caches them for instant re-switching. Clicking empty latent space runs a live in-browser decoder inference at the clicked (z₁, z₂) coordinate.
+
+### Display Parameter Subsets
+
+Training uses 20 parameter values; the visualiser filters down to 4 representative values per model to keep the scatter plot readable:
+
+| Model key              | Displayed values          |
+|------------------------|---------------------------|
+| `lotka_volterra`       | α ∈ {0.1, 0.4, 0.6, 0.8} |
+| `lotka_volterra_gamma` | γ ∈ {0.1, 0.3, 0.5, 0.7} |
+| `lotka_volterra_beta`  | β ∈ {0.01, 0.02, 0.04, 0.06} |
+| `fitzhughnagumo`       | a ∈ {0.1, 0.3, 0.5, 0.7} |
+
+### Colour Ramps
+
+Each model uses a distinct hue to make the switcher views immediately distinguishable:
+
+| Model key              | Colour ramp     |
+|------------------------|-----------------|
+| `lotka_volterra`       | Red             |
+| `lotka_volterra_gamma` | Purple (hsl 260°) |
+| `lotka_volterra_beta`  | Green (hsl 130°)  |
+| `fitzhughnagumo`       | Red             |
+
+## 12. Pipeline
+
+All steps are driven by a `--model` flag; adding a new ODE/parameter combination only requires adding one registry entry to each of the three Python scripts.
+
+```bash
+python3 solve_odes.py    --model <key>
+python3 train_vae.py     --model <key> [--epochs N] [--beta F] [--latent N] [--anneal N]
+python3 export_for_d3.py --model <key>
+python3 -m http.server 8000
+```
+
+`run_pipeline.sh` runs all four models sequentially then starts the HTTP server.
+
+## 13. Latent Space Assumptions
+
+The VAE discovers axis-to-parameter correspondence without supervision. After training, the parameter-correlated axis can be identified via Pearson correlation between each latent dimension and the known parameter labels. With 2-D latent spaces the structure is typically a 1-D curve or arc whose position along the manifold tracks the varied parameter monotonically.
