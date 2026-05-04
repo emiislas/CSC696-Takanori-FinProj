@@ -25,7 +25,10 @@
   .panel { background: #16213e; border-radius: 10px; padding: 16px; }
   .panel h2 { font-size: 0.95rem; color: #a0c4ff; margin-bottom: 8px; }
   .left { flex: 1; min-width: 420px; }
-  .right { flex: 1; min-width: 420px; display: flex; flex-direction: column; gap: 16px; }
+  .middle { flex: 1; min-width: 360px; display: flex; flex-direction: column; gap: 16px; }
+  .right { flex: 1; min-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+  .feat-panel { flex: 1; }
+  .feat-panel h2 { font-size: 0.9rem; }
   .info { font-size: 0.8rem; color: #888; margin-top: 6px; }
   .legend { display: flex; gap: 16px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
   .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
@@ -118,6 +121,18 @@
     <div class="legend" id="legend"></div>
     <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode that latent point live (in-browser via ONNX). <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan, <strong>double-click</strong> to reset.</p>
   </div>
+  <div class="middle">
+    <div class="panel feat-panel">
+      <h2><span id="amp-title">Amplitude vs parameter</span></h2>
+      <div id="amp-plot"></div>
+      <div class="decoded-label" id="amp-label"></div>
+    </div>
+    <div class="panel feat-panel">
+      <h2><span id="phase-title">Phase angle vs parameter</span></h2>
+      <div id="phase-plot"></div>
+      <div class="decoded-label" id="phase-label"></div>
+    </div>
+  </div>
   <div class="right">
     <div class="panel traj-panel">
       <h2 id="ch1-label">Prey x<sub>1</sub>(t)</h2>
@@ -137,6 +152,60 @@ const W = 460, H = 400;
 const margin = {top: 20, right: 20, bottom: 40, left: 50};
 const tw = 440, th = 160;
 const tm = {top: 10, right: 20, bottom: 30, left: 55};
+const fw = 380, fh = 190;
+const fm = {top: 14, right: 18, bottom: 32, left: 50};
+
+// Compute amplitude (peak-to-peak / 2 of channel 1) and phase lag of channel 2
+// relative to channel 1, expressed in radians of one period. Drops the first 20%
+// of the window as transient. Period is estimated from the autocorrelation of ch1.
+function paramFeatures(ch1, ch2) {
+  const n = ch1.length;
+  const skip = Math.floor(n / 5);
+  const np = n - skip;
+  if (np < 8) return { amplitude: 0, phase: 0 };
+
+  let sumP = 0, sumQ = 0, minP = ch1[skip], maxP = ch1[skip];
+  for (let i = skip; i < n; i++) {
+    const v = ch1[i];
+    sumP += v; sumQ += ch2[i];
+    if (v < minP) minP = v;
+    if (v > maxP) maxP = v;
+  }
+  const meanP = sumP / np, meanQ = sumQ / np;
+  const amplitude = 0.5 * (maxP - minP);
+
+  const pc = new Array(np), qc = new Array(np);
+  for (let i = 0; i < np; i++) {
+    pc[i] = ch1[skip + i] - meanP;
+    qc[i] = ch2[skip + i] - meanQ;
+  }
+
+  // Period estimate: first local max of autocorrelation of pc after lag 0
+  function ac(lag) { let s = 0; for (let i = lag; i < np; i++) s += pc[i] * pc[i - lag]; return s; }
+  const maxLag = Math.floor(np / 2);
+  let prev = ac(0), curr = ac(1), period = 0;
+  for (let lag = 2; lag <= maxLag; lag++) {
+    const next = ac(lag);
+    if (curr > prev && curr > next && curr > 0) { period = lag - 1; break; }
+    prev = curr; curr = next;
+  }
+  if (period < 2) return { amplitude, phase: 0 };
+
+  // Phase lag from cross-correlation, restricted to ± half-period
+  const half = Math.floor(period / 2);
+  let bestLag = 0, bestX = -Infinity;
+  for (let lag = -half; lag <= half; lag++) {
+    let s = 0;
+    const lo = Math.max(0, lag);
+    const hi = Math.min(np, np + lag);
+    for (let i = lo; i < hi; i++) s += qc[i] * pc[i - lag];
+    if (s > bestX) { bestX = s; bestLag = lag; }
+  }
+  let phase = 2 * Math.PI * bestLag / period;
+  // Wrap to (-π, π]
+  phase = ((phase + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+  return { amplitude, phase };
+}
 
 const MODELS = {
   lv: {
@@ -301,13 +370,28 @@ function render(id) {
   const alphaMin = d3.min(alphaVals), alphaMax = d3.max(alphaVals);
   const color = a => cfg.colorScale((a - alphaMin) / (alphaMax - alphaMin));
 
+  // Forward declarations — feature plot helpers are assigned in the feature
+  // plot block below. Latent-plot click handlers call them via these closures.
+  let highlightFeatById  = () => {};
+  let clearFeatHighlight = () => {};
+  let setDecodedFeat     = () => {};
+  let clearDecodedFeat   = () => {};
+
   // Clear previous plots
   d3.select('#latent-plot').selectAll('*').remove();
   d3.select('#legend').selectAll('*').remove();
   d3.select('#prey-plot').selectAll('*').remove();
   d3.select('#pred-plot').selectAll('*').remove();
+  d3.select('#amp-plot').selectAll('*').remove();
+  d3.select('#phase-plot').selectAll('*').remove();
   d3.select('#prey-label').text('');
   d3.select('#pred-label').text('');
+  d3.select('#amp-label').text('');
+  d3.select('#phase-label').text('');
+
+  // Update feature-plot titles with the model's parameter symbol
+  document.getElementById('amp-title').innerHTML   = `Amplitude vs ${cfg.paramLabel}`;
+  document.getElementById('phase-title').innerHTML = `Phase angle vs ${cfg.paramLabel}`;
 
   // --- Legend: gradient bar ---
   const legend = d3.select('#legend');
@@ -397,6 +481,8 @@ function render(id) {
     .on('click', function(event, d) {
       event.stopPropagation();
       highlightDot(this);
+      highlightFeatById(d.id);
+      clearDecodedFeat();
       showTrajectory(d.prey, d.predator,
         `Sample #${d.id} (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
         color(+d.alpha.toFixed(cfg.precision)));
@@ -448,6 +534,138 @@ function render(id) {
   const preySvg = makeTrajectoryPlot('#prey-plot');
   const predSvg = makeTrajectoryPlot('#pred-plot');
 
+  // --- Feature Plots: parameter vs amplitude, parameter vs phase ---
+  const features = samples.map(d => paramFeatures(d.prey, d.predator));
+
+  const paramExtent = d3.extent(samples, d => d.alpha);
+  const paramPad = (paramExtent[1] - paramExtent[0]) * 0.06 || 0.05;
+  const ampExtent = d3.extent(features, f => f.amplitude);
+  const ampPad = (ampExtent[1] - ampExtent[0]) * 0.1 || 0.5;
+
+  function makeFeatPlot(containerId, xMin, xMax, yMin, yMax, xLabel, yLabel) {
+    const s = d3.select(containerId).append('svg')
+      .attr('width', fw).attr('height', fh);
+    const xS = d3.scaleLinear().domain([xMin, xMax]).range([fm.left, fw - fm.right]);
+    const yS = d3.scaleLinear().domain([yMin, yMax]).nice().range([fh - fm.bottom, fm.top]);
+    s.append('g')
+      .attr('transform', `translate(0,${fh - fm.bottom})`)
+      .call(d3.axisBottom(xS).ticks(5))
+      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
+    s.append('g')
+      .attr('transform', `translate(${fm.left},0)`)
+      .call(d3.axisLeft(yS).ticks(4))
+      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
+    s.append('text')
+      .attr('x', fw / 2).attr('y', fh - 4)
+      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
+      .text(xLabel);
+    s.append('text')
+      .attr('x', 12).attr('y', fh / 2)
+      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
+      .attr('transform', `rotate(-90,12,${fh/2})`)
+      .text(yLabel);
+    return { svg: s, xS, yS };
+  }
+
+  const ampPlot = makeFeatPlot('#amp-plot',
+    paramExtent[0] - paramPad, paramExtent[1] + paramPad,
+    ampExtent[0] - ampPad,    ampExtent[1] + ampPad,
+    cfg.paramLabel, 'Amplitude');
+  const phasePlot = makeFeatPlot('#phase-plot',
+    paramExtent[0] - paramPad, paramExtent[1] + paramPad,
+    -Math.PI, Math.PI,
+    cfg.paramLabel, 'Phase (rad)');
+
+  // Reference lines at -π/2, 0, π/2 on the phase plot
+  [-Math.PI / 2, 0, Math.PI / 2].forEach(yv => {
+    phasePlot.svg.append('line')
+      .attr('x1', fm.left).attr('x2', fw - fm.right)
+      .attr('y1', phasePlot.yS(yv)).attr('y2', phasePlot.yS(yv))
+      .attr('stroke', '#3a4a6e').attr('stroke-width', 0.7)
+      .attr('stroke-dasharray', yv === 0 ? null : '2,3');
+  });
+
+  function makeFeatDots(plot, getY) {
+    return plot.svg.selectAll('.feat-dot')
+      .data(samples)
+      .join('circle')
+      .attr('class', 'feat-dot sample-dot')
+      .attr('cx', d => plot.xS(d.alpha))
+      .attr('cy', (d, i) => plot.yS(getY(i)))
+      .attr('r', 4.5)
+      .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 1)
+      .attr('opacity', 0.85)
+      .on('click', function(event, d) {
+        event.stopPropagation();
+        // Find the matching latent dot and route through the standard handler
+        const lDot = dotGroup.selectAll('.sample-dot').nodes()
+          .find(node => d3.select(node).datum().id === d.id);
+        if (lDot) highlightDot(lDot);
+        highlightFeatById(d.id);
+        clearDecodedFeat();
+        showTrajectory(d.prey, d.predator,
+          `Sample #${d.id} (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+          color(+d.alpha.toFixed(cfg.precision)));
+        moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+      });
+  }
+  const ampDots   = makeFeatDots(ampPlot,   i => features[i].amplitude);
+  const phaseDots = makeFeatDots(phasePlot, i => features[i].phase);
+
+  // Decoded reference markers — hidden until user decodes a latent point
+  function makeDecodedRef(plot) {
+    const g = plot.svg.append('g').style('display', 'none');
+    g.append('line')
+      .attr('class', 'decoded-line')
+      .attr('x1', fm.left).attr('x2', fw - fm.right)
+      .attr('stroke', '#ffd166').attr('stroke-width', 1.2)
+      .attr('stroke-dasharray', '4,3');
+    g.append('circle')
+      .attr('class', 'decoded-marker')
+      .attr('cx', (fm.left + fw - fm.right) / 2)
+      .attr('r', 5).attr('fill', '#ffd166').attr('stroke', '#1a1a2e').attr('stroke-width', 1.5);
+    return g;
+  }
+  const ampDecodedRef   = makeDecodedRef(ampPlot);
+  const phaseDecodedRef = makeDecodedRef(phasePlot);
+
+  // Wire up forward-declared helpers
+  highlightFeatById = (id) => {
+    [ampDots, phaseDots].forEach(sel => {
+      sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.6);
+      sel.filter(d => d.id === id)
+        .attr('stroke', '#ffd166').attr('stroke-width', 2.5).attr('r', 7).attr('opacity', 1);
+    });
+  };
+  clearFeatHighlight = () => {
+    [ampDots, phaseDots].forEach(sel =>
+      sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.85));
+  };
+  setDecodedFeat = (feat, label) => {
+    if (!feat) return;
+    const ay = ampPlot.yS(feat.amplitude);
+    const py = phasePlot.yS(feat.phase);
+    ampDecodedRef.style('display', null);
+    ampDecodedRef.select('.decoded-line').attr('y1', ay).attr('y2', ay);
+    ampDecodedRef.select('.decoded-marker').attr('cy', ay);
+    phaseDecodedRef.style('display', null);
+    phaseDecodedRef.select('.decoded-line').attr('y1', py).attr('y2', py);
+    phaseDecodedRef.select('.decoded-marker').attr('cy', py);
+    d3.select('#amp-label').text(`${label} → amplitude = ${feat.amplitude.toFixed(2)}`);
+    d3.select('#phase-label').text(`${label} → phase = ${feat.phase.toFixed(2)} rad`);
+    // Also dim training dots so the decoded reference stands out
+    [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.4));
+  };
+  clearDecodedFeat = () => {
+    ampDecodedRef.style('display', 'none');
+    phaseDecodedRef.style('display', 'none');
+    d3.select('#amp-label').text('');
+    d3.select('#phase-label').text('');
+    [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.85));
+  };
+
   function drawLine(svgEl, values, lineColor, labelEl, label) {
     const tVals = values.map((_, i) => i * meta.dt);
     const xS = d3.scaleLinear().domain([0, d3.max(tVals)]).range([tm.left, tw - tm.right]);
@@ -487,6 +705,8 @@ function render(id) {
     showTrajectory(prey, predator, label, '#ffd166');
     moveCrosshair(xScale(z1), yScale(z2));
     clearHighlight();
+    clearFeatHighlight();
+    setDecodedFeat(paramFeatures(prey, predator), label);
   }
 
   function moveCrosshair(cx, cy) {
@@ -511,6 +731,7 @@ function render(id) {
       `Sample #0 (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
       color(+d.alpha.toFixed(cfg.precision)));
     moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+    highlightFeatById(d.id);
   }
 }
 
