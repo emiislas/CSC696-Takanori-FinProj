@@ -37,6 +37,12 @@ def _fhn_rhs(t, X, a):
     return [v - (v**3) / 3 - w + I,
             tau * (v + a - b * w)]
 
+def _fhn_I_rhs(t, X, I):
+    v, w = X
+    a, b, tau = 0.7, 0.8, 0.4
+    return [v - (v**3) / 3 - w + I,
+            tau * (v + a - b * w)]
+
 MODELS = {
     'lotka_volterra': dict(
         rhs         = _lv_rhs,
@@ -73,6 +79,15 @@ MODELS = {
         out_file    = 'fitzhughnagumo_data.pt',
         plot_title  = (r'Membrane voltage $v$(t)', r'Recovery variable $w$(t)'),
         param_label = 'a',
+    ),
+    'fitzhughnagumo_I': dict(
+        rhs         = _fhn_I_rhs,
+        y0          = [0.0, 0.0],
+        alphas      = np.linspace(0.35, 1.5, 20).tolist(),   # I values; 0.35 is just above Hopf
+        ch_names    = ['Voltage', 'Recovery'],
+        out_file    = 'fhn_I_data.pt',
+        plot_title  = (r'Membrane voltage $v$(t)', r'Recovery variable $w$(t)'),
+        param_label = 'I',
     ),
 }
 
