@@ -89,3 +89,7 @@
 - **File:** `export_for_d3.py` — Added `fitzhughnagumo_I` registry entry; display values `[0.35, 0.6, 0.9, 1.2, 1.5]`; outputs `fhn_I_data_for_d3.json` + `fhn_I_decoder.onnx`.
 - **File:** `index.html` — Added "FitzHugh-Nagumo (I)" switcher button with an orange colour ramp (hsl 30°); equation panel shows I highlighted in the `dv/dt` term.
 - **File:** `run_pipeline.sh` — Added `fitzhughnagumo_I` to all three pipeline steps.
+
+## 18. Fixed Output Paths in Unified Pipeline Scripts
+- **File:** `src/solve_odes.py` — Added `ROOT = Path(__file__).resolve().parent.parent`, `DATA_DIR = ROOT / 'data'`, and `DATA_DIR.mkdir(parents=True, exist_ok=True)`. All five `out_file` registry values updated from bare filenames (e.g. `'predator_prey_data.pt'`) to `DATA_DIR / '<filename>'`. Datasets now always save to `data/` regardless of working directory.
+- **File:** `src/train_vae.py` — Added `ROOT`, `DATA_DIR`, `MODELS_DIR`, and `FIGURES_DIR` path constants (mirroring the pattern in the old per-model scripts). All five registry entries updated: `data_file` now reads from `DATA_DIR/`, `weights` saves to `MODELS_DIR/`, and `loss_plot` saves to `FIGURES_DIR/`. `mkdir(parents=True, exist_ok=True)` called for both output directories.

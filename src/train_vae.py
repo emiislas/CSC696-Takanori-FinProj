@@ -8,42 +8,50 @@ Usage:
 """
 
 import argparse
+from pathlib import Path
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from vae import VAE
 
+ROOT        = Path(__file__).resolve().parent.parent
+DATA_DIR    = ROOT / 'data'
+MODELS_DIR  = ROOT / 'models'
+FIGURES_DIR = ROOT / 'figures'
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
 # ── Model registry ────────────────────────────────────────────────────────────
 
 MODELS = {
     'lotka_volterra': dict(
-        data_file  = 'predator_prey_data.pt',
-        weights    = 'vae_lotkavolt.pt',
-        loss_plot  = 'vae_loss_curve.png',
+        data_file  = DATA_DIR / 'predator_prey_data.pt',
+        weights    = MODELS_DIR / 'vae_lotkavolt.pt',
+        loss_plot  = FIGURES_DIR / 'vae_loss_curve.png',
         plot_title = 'VAE Training Loss — Lotka-Volterra',
     ),
     'lotka_volterra_beta': dict(
-        data_file  = 'lv_beta_data.pt',
-        weights    = 'vae_lv_beta.pt',
-        loss_plot  = 'vae_loss_curve_lv_beta.png',
+        data_file  = DATA_DIR / 'lv_beta_data.pt',
+        weights    = MODELS_DIR / 'vae_lv_beta.pt',
+        loss_plot  = FIGURES_DIR / 'vae_loss_curve_lv_beta.png',
         plot_title = 'VAE Training Loss — Lotka-Volterra (β varies)',
     ),
     'lotka_volterra_gamma': dict(
-        data_file  = 'lv_gamma_data.pt',
-        weights    = 'vae_lv_gamma.pt',
-        loss_plot  = 'vae_loss_curve_lv_gamma.png',
+        data_file  = DATA_DIR / 'lv_gamma_data.pt',
+        weights    = MODELS_DIR / 'vae_lv_gamma.pt',
+        loss_plot  = FIGURES_DIR / 'vae_loss_curve_lv_gamma.png',
         plot_title = 'VAE Training Loss — Lotka-Volterra (γ varies)',
     ),
     'fitzhughnagumo': dict(
-        data_file  = 'fitzhughnagumo_data.pt',
-        weights    = 'vae_fitzhughnagumo.pt',
-        loss_plot  = 'vae_loss_curve_fitzhughnagumo.png',
+        data_file  = DATA_DIR / 'fitzhughnagumo_data.pt',
+        weights    = MODELS_DIR / 'vae_fitzhughnagumo.pt',
+        loss_plot  = FIGURES_DIR / 'vae_loss_curve_fitzhughnagumo.png',
         plot_title = 'VAE Training Loss — FitzHugh-Nagumo',
     ),
     'fitzhughnagumo_I': dict(
-        data_file  = 'fhn_I_data.pt',
-        weights    = 'vae_fhn_I.pt',
-        loss_plot  = 'vae_loss_curve_fhn_I.png',
+        data_file  = DATA_DIR / 'fhn_I_data.pt',
+        weights    = MODELS_DIR / 'vae_fhn_I.pt',
+        loss_plot  = FIGURES_DIR / 'vae_loss_curve_fhn_I.png',
         plot_title = 'VAE Training Loss — FitzHugh-Nagumo (I varies)',
     ),
 }

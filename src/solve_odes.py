@@ -7,10 +7,15 @@ Usage:
 """
 
 import argparse
+from pathlib import Path
 import numpy as np
 import torch
 from scipy.integrate import solve_ivp
 import matplotlib.pyplot as plt
+
+ROOT     = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / 'data'
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Model registry ────────────────────────────────────────────────────────────
 # Each entry defines everything needed to integrate, window, and save one model.
@@ -49,7 +54,7 @@ MODELS = {
         y0          = [10.0, 10.0],
         alphas      = np.linspace(0.1, 0.8, 20).tolist(),
         ch_names    = ['Prey', 'Predator'],
-        out_file    = 'predator_prey_data.pt',
+        out_file    = DATA_DIR / 'predator_prey_data.pt',
         plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
         param_label = r'$\alpha$',
     ),
@@ -58,7 +63,7 @@ MODELS = {
         y0          = [10.0, 10.0],
         alphas      = np.linspace(0.01, 0.1, 20).tolist(),   # beta values
         ch_names    = ['Prey', 'Predator'],
-        out_file    = 'lv_beta_data.pt',
+        out_file    = DATA_DIR / 'lv_beta_data.pt',
         plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
         param_label = r'$\beta$',
     ),
@@ -67,7 +72,7 @@ MODELS = {
         y0          = [10.0, 10.0],
         alphas      = np.linspace(0.1, 0.8, 20).tolist(),   # gamma values
         ch_names    = ['Prey', 'Predator'],
-        out_file    = 'lv_gamma_data.pt',
+        out_file    = DATA_DIR / 'lv_gamma_data.pt',
         plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
         param_label = r'$\gamma$',
     ),
@@ -76,7 +81,7 @@ MODELS = {
         y0          = [0.0, 0.0],
         alphas      = np.linspace(0.10, 0.70, 20).tolist(),
         ch_names    = ['Voltage', 'Recovery'],
-        out_file    = 'fitzhughnagumo_data.pt',
+        out_file    = DATA_DIR / 'fitzhughnagumo_data.pt',
         plot_title  = (r'Membrane voltage $v$(t)', r'Recovery variable $w$(t)'),
         param_label = 'a',
     ),
@@ -85,7 +90,7 @@ MODELS = {
         y0          = [0.0, 0.0],
         alphas      = np.linspace(0.35, 1.5, 20).tolist(),   # I values; 0.35 is just above Hopf
         ch_names    = ['Voltage', 'Recovery'],
-        out_file    = 'fhn_I_data.pt',
+        out_file    = DATA_DIR / 'fhn_I_data.pt',
         plot_title  = (r'Membrane voltage $v$(t)', r'Recovery variable $w$(t)'),
         param_label = 'I',
     ),
