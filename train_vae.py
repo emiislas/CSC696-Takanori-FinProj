@@ -22,6 +22,18 @@ MODELS = {
         loss_plot  = 'vae_loss_curve.png',
         plot_title = 'VAE Training Loss — Lotka-Volterra',
     ),
+    'lotka_volterra_beta': dict(
+        data_file  = 'lv_beta_data.pt',
+        weights    = 'vae_lv_beta.pt',
+        loss_plot  = 'vae_loss_curve_lv_beta.png',
+        plot_title = 'VAE Training Loss — Lotka-Volterra (β varies)',
+    ),
+    'lotka_volterra_gamma': dict(
+        data_file  = 'lv_gamma_data.pt',
+        weights    = 'vae_lv_gamma.pt',
+        loss_plot  = 'vae_loss_curve_lv_gamma.png',
+        plot_title = 'VAE Training Loss — Lotka-Volterra (γ varies)',
+    ),
     'fitzhughnagumo': dict(
         data_file  = 'fitzhughnagumo_data.pt',
         weights    = 'vae_fitzhughnagumo.pt',

@@ -20,6 +20,18 @@ def _lv_rhs(t, X, a):
     return [a * x1 - 0.02 * x1 * x2,
             0.02 * x1 * x2 - 0.4 * x2]
 
+def _lv_gamma_rhs(t, X, gamma):
+    x1, x2 = X
+    return [0.4 * x1 - 0.02 * x1 * x2,
+            0.02 * x1 * x2 - gamma * x2]
+
+def _lv_beta_rhs(t, X, beta):
+    # delta tied to beta so equilibria stay fixed at (gamma/beta, alpha/beta) = (1,1)
+    # only the cycle amplitude/shape changes
+    x1, x2 = X
+    return [0.4 * x1 - beta * x1 * x2,
+            beta * x1 * x2 - 0.4 * x2]
+
 def _fhn_rhs(t, X, a):
     v, w = X
     b, tau, I = 0.8, 0.4, 0.5
@@ -35,6 +47,24 @@ MODELS = {
         out_file    = 'predator_prey_data.pt',
         plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
         param_label = r'$\alpha$',
+    ),
+    'lotka_volterra_beta': dict(
+        rhs         = _lv_beta_rhs,
+        y0          = [10.0, 10.0],
+        alphas      = np.linspace(0.01, 0.06, 20).tolist(),   # beta (=delta) values
+        ch_names    = ['Prey', 'Predator'],
+        out_file    = 'lv_beta_data.pt',
+        plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
+        param_label = r'$\beta$',
+    ),
+    'lotka_volterra_gamma': dict(
+        rhs         = _lv_gamma_rhs,
+        y0          = [10.0, 10.0],
+        alphas      = np.linspace(0.1, 0.8, 20).tolist(),   # gamma values
+        ch_names    = ['Prey', 'Predator'],
+        out_file    = 'lv_gamma_data.pt',
+        plot_title  = (r'Prey $x_1$(t)', r'Predator $x_2$(t)'),
+        param_label = r'$\gamma$',
     ),
     'fitzhughnagumo': dict(
         rhs         = _fhn_rhs,

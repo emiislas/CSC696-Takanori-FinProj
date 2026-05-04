@@ -55,3 +55,23 @@
 - **File:** `export_for_d3.py` *(replaces `export_for_d3.py` and `export_for_d3_fitzhughnagumo.py`)* — Unified export with per-model config for data file, weights, JSON/ONNX output paths, display alphas, and channel key names. The `ch1_key`/`ch2_key` config entries let FHN continue reusing `prey`/`predator` as JSON keys, preserving the `index.html` schema contract.
 - **File:** `run_pipeline.sh` — Updated to call the three unified scripts with `--model` flags instead of the six separate scripts.
 - **Adding a new ODE model** now only requires adding one dict entry to each of the three `MODELS` registries — no new files needed.
+
+## 13. Lotka-Volterra γ Variant
+- Added a third Lotka-Volterra view that varies γ (predator death rate) while fixing α=0.4, β=δ=0.02.
+- γ ranges over `[0.1, 0.8]` with 20 linearly spaced values, matching the α range for direct comparability.
+- **Note:** γ and α produce qualitatively similar latent spaces because both appear linearly in the oscillation frequency ω=√(αγ) and the fixed-point equations, so the VAE learns the same one-dimensional manifold traversed in the same direction. The view is retained for pedagogical comparison.
+- **File:** `solve_odes.py` — Added `_lv_gamma_rhs` (fixes α, varies γ) and `lotka_volterra_gamma` registry entry outputting `lv_gamma_data.pt`.
+- **File:** `train_vae.py` — Added `lotka_volterra_gamma` registry entry (`vae_lv_gamma.pt`).
+- **File:** `export_for_d3.py` — Added `lotka_volterra_gamma` registry entry; display gammas `[0.1, 0.3, 0.5, 0.7]`; outputs `lv_gamma_data_for_d3.json` + `lv_gamma_decoder.onnx`.
+- **File:** `index.html` — Added "Lotka-Volterra (γ)" switcher button with a purple colour ramp (hsl 260°) to distinguish it from the red α ramp.
+- **File:** `run_pipeline.sh` — Added `lotka_volterra_gamma` to all three pipeline steps.
+
+## 14. Lotka-Volterra β Variant
+- Added a fourth view that varies β (predation rate) with δ tied to β, keeping the system's fixed point constant at (x₁*, x₂*) = (1, 1) regardless of β. This isolates the effect of interaction strength on limit cycle morphology.
+- β ranges over `[0.01, 0.06]` with 20 linearly spaced values. At low β (≈0.01) prey populations swing to ~400× equilibrium in sharp spikes; at high β (≈0.06) oscillations are tight and mild — a qualitatively different waveform shape compared to the α and γ variants, which only scale frequency.
+- Because β governs the nonlinear coupling term β·x₁·x₂ in both equations, the VAE must encode genuinely different trajectory morphologies rather than scaled versions of the same cycle, producing a more structurally interesting latent geometry.
+- **File:** `solve_odes.py` — Added `_lv_beta_rhs` (fixes α=0.4, γ=0.4, sets δ=β) and `lotka_volterra_beta` registry entry outputting `lv_beta_data.pt`.
+- **File:** `train_vae.py` — Added `lotka_volterra_beta` registry entry (`vae_lv_beta.pt`).
+- **File:** `export_for_d3.py` — Added `lotka_volterra_beta` registry entry; display betas `[0.01, 0.02, 0.04, 0.06]` with `alpha_precision=2`; outputs `lv_beta_data_for_d3.json` + `lv_beta_decoder.onnx`.
+- **File:** `index.html` — Added "Lotka-Volterra (β)" switcher button with a green colour ramp (hsl 130°); switcher now has four buttons with corrected border-radius CSS.
+- **File:** `run_pipeline.sh` — Added `lotka_volterra_beta` to all three pipeline steps.
