@@ -1,10 +1,18 @@
+from pathlib import Path
 import json
 import torch
 import numpy as np
 from vae import VAE
 
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / 'data'
+MODELS_DIR = ROOT / 'models'
+WEB_DIR = ROOT / 'web'
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+WEB_DIR.mkdir(parents=True, exist_ok=True)
+
 # Load dataset
-data = torch.load('predator_prey_data.pt', weights_only=True)
+data = torch.load(DATA_DIR / 'predator_prey_data.pt', weights_only=True)
 x, y = data['x'], data['y']
 x_mean, x_std = data['x_mean'], data['x_std']
 window_size = data['window_size']
@@ -12,7 +20,7 @@ input_width = x.shape[1]
 
 # Load model
 model = VAE(input_width=input_width, latent_dim=2, learning_rate=1e-3)
-model.load_state_dict(torch.load('vae_lotkavolt.pt', weights_only=True))
+model.load_state_dict(torch.load(MODELS_DIR / 'vae_lotkavolt.pt', weights_only=True))
 model.eval()
 
 dt = 0.1
@@ -59,18 +67,19 @@ z_max = z.max(axis=0)
 padding = 0.3
 
 # Export decoder to ONNX for client-side inference (Improvement 4a)
+onnx_path = MODELS_DIR / 'decoder.onnx'
 dummy_z = torch.zeros(1, 2, dtype=torch.float32)
 torch.onnx.export(
     model.decoder,
     (dummy_z,),
-    'decoder.onnx',
+    str(onnx_path),
     input_names=['z'],
     output_names=['x_recon'],
     dynamic_axes={'z': {0: 'batch'}, 'x_recon': {0: 'batch'}},
     opset_version=14,
     dynamo=False,
 )
-print("Exported decoder to decoder.onnx")
+print(f"Exported decoder to {onnx_path}")
 
 output = {
     'samples': samples,
@@ -85,7 +94,8 @@ output = {
     }
 }
 
-with open('data_for_d3.json', 'w') as f:
+json_path = WEB_DIR / 'data_for_d3.json'
+with open(json_path, 'w') as f:
     json.dump(output, f)
 
-print(f"Exported {len(samples)} samples to data_for_d3.json (decoder grid replaced by ONNX runtime)")
+print(f"Exported {len(samples)} samples to {json_path}")

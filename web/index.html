@@ -62,7 +62,7 @@ const tm = {top: 10, right: 20, bottom: 30, left: 55};
 
 Promise.all([
   d3.json('data_for_d3.json'),
-  ort.InferenceSession.create('decoder.onnx'),
+  ort.InferenceSession.create('../models/decoder.onnx'),
 ]).then(([data, session]) => {
   const { samples, x_mean, x_std, meta } = data;
   const xMean = Float32Array.from(x_mean);

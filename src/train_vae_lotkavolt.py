@@ -1,10 +1,18 @@
+from pathlib import Path
 import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader, TensorDataset
 from vae import VAE
 
+ROOT = Path(__file__).resolve().parent.parent
+DATA_DIR = ROOT / 'data'
+MODELS_DIR = ROOT / 'models'
+FIGURES_DIR = ROOT / 'figures'
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+
 # Load dataset
-data = torch.load('predator_prey_data.pt', weights_only=True)
+data = torch.load(DATA_DIR / 'predator_prey_data.pt', weights_only=True)
 x, y = data['x'], data['y']
 window_size = data['window_size']
 input_width = x.shape[1]
@@ -34,9 +42,10 @@ plt.ylabel('Loss')
 plt.title('VAE Training Loss')
 plt.legend()
 plt.tight_layout()
-plt.savefig('vae_loss_curve.png', dpi=150)
+plt.savefig(FIGURES_DIR / 'vae_loss_curve.png', dpi=150)
 # plt.show()
 
 # Save weights
-torch.save(model.state_dict(), 'vae_lotkavolt.pt')
-print("Saved model weights to vae_lotkavolt.pt")
+weights_path = MODELS_DIR / 'vae_lotkavolt.pt'
+torch.save(model.state_dict(), weights_path)
+print(f"Saved model weights to {weights_path}")
