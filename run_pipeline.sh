@@ -3,14 +3,26 @@ set -e
 
 cd "$(dirname "$0")"
 
-echo "=== Step 1: Solving Lotka-Volterra ODE ==="
-python src/solve_lotka_volterra.py
+echo "=== Step 1: Solving ODEs ==="
+python solve_odes.py --model lotka_volterra
+python solve_odes.py --model lotka_volterra_gamma
+python solve_odes.py --model lotka_volterra_beta
+python solve_odes.py --model fitzhughnagumo
+python solve_odes.py --model fitzhughnagumo_I
 
-echo "=== Step 2: Training VAE ==="
-python src/train_vae_lotkavolt.py
+echo "=== Step 2: Training VAEs ==="
+python train_vae.py --model lotka_volterra --beta 0.01 --anneal 50
+python train_vae.py --model lotka_volterra_gamma --beta 0.01 --anneal 50
+python train_vae.py --model lotka_volterra_beta --beta 0.01 --anneal 50
+python train_vae.py --model fitzhughnagumo --beta 0.01 --anneal 50
+python train_vae.py --model fitzhughnagumo_I --beta 0.01 --anneal 50
 
 echo "=== Step 3: Exporting data for D3 ==="
-python src/export_for_d3.py
+python src/export_for_d3.py --model lotka_volterra
+python src/export_for_d3.py --model lotka_volterra_gamma
+python src/export_for_d3.py --model lotka_volterra_beta
+python src/export_for_d3.py --model fitzhughnagumo
+python src/export_for_d3.py --model fitzhughnagumo_I
 
 echo "=== Step 4: Launching visualization ==="
 echo "Open http://localhost:8000/web/index.html in your browser"
