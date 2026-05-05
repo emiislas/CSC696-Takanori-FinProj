@@ -93,3 +93,12 @@
 ## 18. Fixed Output Paths in Unified Pipeline Scripts
 - **File:** `src/solve_odes.py` — Added `ROOT = Path(__file__).resolve().parent.parent`, `DATA_DIR = ROOT / 'data'`, and `DATA_DIR.mkdir(parents=True, exist_ok=True)`. All five `out_file` registry values updated from bare filenames (e.g. `'predator_prey_data.pt'`) to `DATA_DIR / '<filename>'`. Datasets now always save to `data/` regardless of working directory.
 - **File:** `src/train_vae.py` — Added `ROOT`, `DATA_DIR`, `MODELS_DIR`, and `FIGURES_DIR` path constants (mirroring the pattern in the old per-model scripts). All five registry entries updated: `data_file` now reads from `DATA_DIR/`, `weights` saves to `MODELS_DIR/`, and `loss_plot` saves to `FIGURES_DIR/`. `mkdir(parents=True, exist_ok=True)` called for both output directories.
+
+## 19. Quantitative Evaluation
+- New top-level `evaluation/` folder containing a single entry-point script and the artifacts it produces.
+- Three metric families per model: (a) reconstruction MSE on a deterministic 20% held-out split *and* on freshly-integrated trajectories at parameter values placed halfway between every pair of training values (a true held-out test, since `train_vae.py` uses an unseeded random split); (b) latent→parameter regression R² via both linear regression (full data) and 5-NN regression (held-out split) — the gap between the two is itself diagnostic, since most models organize the parameter along a curved 1-D manifold inside the 2-D code; (c) behavioral labeling (fixed_point vs. limit_cycle) by measuring channel-1 amplitude in the last 80% of each window, plus silhouette score on 2-D latents when both classes are present.
+- Reuses the model registries from `src/solve_odes.py` and `src/train_vae.py` so adding a new model requires no changes here.
+- **Notable finding:** `fitzhughnagumo` (a-sweep) yields kNN R² ≈ 0.02, meaning the trained VAE's latent space does not organize by `a` — every other sweep gets R² ≥ 0.78. Worth investigating before final write-up.
+- **File:** `evaluation/evaluate.py` — Loops over all models (or `--model <key>` for one), writes `evaluation/results.json`, `evaluation/results.md` (markdown table with definitions), and `evaluation/metrics_summary.png` (paired bar charts of reconstruction MSE and R²).
+- **File:** `README.md` — Added `evaluation/` to the repo layout, an entry to the Files table, and a Quantitative evaluation usage section.
+- **File:** `run_pipeline.sh` — Fixed broken `solve_odes.py` / `train_vae.py` invocations to use the `src/` prefix.

@@ -1,225 +1,372 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>VAE Latent Space Explorer</title>
-<script src="https://d3js.org/d3.v7.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$','$']],
-      displayMath: [['$$','$$']],
-    },
-    options: { skipHtmlTags: ['script','noscript','style','textarea'] },
-    startup: { typeset: false }
-  };
-</script>
-<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
-  h1 { text-align: center; padding: 16px 0 4px; font-size: 1.3rem; color: #a0c4ff; }
-  .subtitle { text-align: center; font-size: 0.85rem; color: #888; margin-bottom: 12px; }
-  .container { display: flex; gap: 16px; padding: 0 24px 24px; }
-  .panel { background: #16213e; border-radius: 10px; padding: 16px; }
-  .panel h2 { font-size: 0.95rem; color: #a0c4ff; margin-bottom: 8px; }
-  .left { flex: 1; min-width: 420px; }
-  .middle { flex: 1; min-width: 360px; display: flex; flex-direction: column; gap: 16px; }
-  .right { flex: 1; min-width: 380px; display: flex; flex-direction: column; gap: 16px; }
-  .feat-panel { flex: 1; }
-  .feat-panel h2 { font-size: 0.9rem; }
-  .info { font-size: 0.8rem; color: #888; margin-top: 6px; }
-  .legend { display: flex; gap: 16px; justify-content: center; margin-top: 8px; flex-wrap: wrap; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; }
-  .legend-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #444; }
-  .traj-panel { flex: 1; }
-  .decoded-label { font-size: 0.8rem; color: #ffd166; margin-top: 4px; }
-  svg { display: block; }
-  .crosshair { pointer-events: none; }
-  .grid-cell { cursor: crosshair; }
-  .sample-dot { cursor: pointer; }
-  .sample-dot:hover { stroke-width: 3px !important; }
+  <meta charset="UTF-8">
+  <title>VAE Latent Space Explorer</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$']],
+        displayMath: [['$$', '$$']],
+      },
+      options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea'] },
+      startup: { typeset: false }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-  /* ── Switcher (only new CSS) ───────────────────────────────── */
-  .switcher-bar {
-    display: flex;
-    justify-content: center;
-    gap: 0;
-    margin-bottom: 12px;
-  }
-  .switcher-bar button {
-    padding: 6px 20px;
-    background: #16213e;
-    border: 1px solid #2a3a5e;
-    color: #888;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 0.82rem;
-    cursor: pointer;
-    transition: background 0.2s, color 0.2s;
-  }
-  .switcher-bar button:first-child { border-radius: 6px 0 0 6px; }
-  .switcher-bar button:last-child  { border-radius: 0 6px 6px 0; }
-  .switcher-bar button:not(:first-child) { border-left: none; }
-  .switcher-bar button.active { background: #a0c4ff; color: #1a1a2e; font-weight: 600; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+    }
 
-  /* ── Equation panel ─────────────────────────────────────────── */
-  .eq-panel {
-    background: #16213e;
-    border-radius: 10px;
-    margin: 0 24px 14px;
-    padding: 14px 24px 10px;
-    display: flex;
-    align-items: flex-start;
-    gap: 32px;
-    flex-wrap: wrap;
-  }
-  .eq-block { flex: 1; min-width: 200px; }
-  .eq-block .eq-title {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #a0c4ff;
-    margin-bottom: 6px;
-  }
-  .eq-block .eq-body {
-    font-size: 0.92rem;
-    color: #d0d8f0;
-    line-height: 1.9;
-  }
-  .eq-block .eq-body .varied {
-    color: #ffd166;
-    font-weight: 700;
-  }
-  .eq-fixed {
-    font-size: 0.78rem;
-    color: #777;
-    margin-top: 6px;
-    line-height: 1.7;
-  }
-</style>
+    h1 {
+      text-align: center;
+      padding: 16px 0 4px;
+      font-size: 1.3rem;
+      color: #a0c4ff;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    .container {
+      display: flex;
+      gap: 16px;
+      padding: 0 24px 24px;
+    }
+
+    .panel {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .panel h2 {
+      font-size: 0.95rem;
+      color: #a0c4ff;
+      margin-bottom: 8px;
+    }
+
+    .left {
+      flex: 1;
+      min-width: 420px;
+    }
+
+    .middle {
+      flex: 1;
+      min-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .right {
+      flex: 1;
+      min-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .feat-panel {
+      flex: 1;
+    }
+
+    .feat-panel h2 {
+      font-size: 0.9rem;
+    }
+
+    .info {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 6px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.8rem;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 1px solid #444;
+    }
+
+    .traj-panel {
+      flex: 1;
+    }
+
+    .decoded-label {
+      font-size: 0.8rem;
+      color: #ffd166;
+      margin-top: 4px;
+    }
+
+    svg {
+      display: block;
+    }
+
+    .crosshair {
+      pointer-events: none;
+    }
+
+    .grid-cell {
+      cursor: crosshair;
+    }
+
+    .sample-dot {
+      cursor: pointer;
+    }
+
+    .sample-dot:hover {
+      stroke-width: 3px !important;
+    }
+
+    /* ── Switcher (only new CSS) ───────────────────────────────── */
+    .switcher-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 12px;
+    }
+
+    .switcher-bar button {
+      padding: 6px 20px;
+      background: #16213e;
+      border: 1px solid #2a3a5e;
+      color: #888;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .switcher-bar button:first-child {
+      border-radius: 6px 0 0 6px;
+    }
+
+    .switcher-bar button:last-child {
+      border-radius: 0 6px 6px 0;
+    }
+
+    .switcher-bar button:not(:first-child) {
+      border-left: none;
+    }
+
+    .switcher-bar button.active {
+      background: #a0c4ff;
+      color: #1a1a2e;
+      font-weight: 600;
+    }
+
+    /* ── Equation panel ─────────────────────────────────────────── */
+    .eq-panel {
+      background: #16213e;
+      border-radius: 10px;
+      margin: 0 24px 14px;
+      padding: 14px 24px 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .eq-block {
+      flex: 1;
+      min-width: 200px;
+      text-align: center;
+    }
+
+    .eq-block .eq-title {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #a0c4ff;
+      margin-bottom: 6px;
+    }
+
+    .eq-block .eq-body {
+      font-size: 0.92rem;
+      color: #d0d8f0;
+      line-height: 1.9;
+      text-align: center;
+    }
+
+    .eq-block .eq-body mjx-container {
+      display: inline-block;
+    }
+
+    .eq-block .eq-body mjx-container[display="true"] {
+      display: block;
+      text-align: center;
+      margin: 0;
+    }
+
+    .eq-block .eq-body .varied {
+      color: #ffd166;
+      font-weight: 700;
+    }
+
+    .eq-fixed {
+      font-size: 0.78rem;
+      color: #777;
+      margin-top: 6px;
+      line-height: 1.7;
+    }
+  </style>
 </head>
+
 <body>
 
-<h1 id="main-title">Lotka-Volterra VAE Latent Space Explorer</h1>
-<p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
+  <h1 id="main-title">Lotka-Volterra VAE Latent Space Explorer</h1>
+  <p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
 
-<div class="switcher-bar">
-  <button id="btn-lv"       class="active" onclick="switchModel('lv')">Lotka-Volterra (α)</button>
-  <button id="btn-lv-gamma"              onclick="switchModel('lv_gamma')">Lotka-Volterra (γ)</button>
-  <button id="btn-lv-beta"               onclick="switchModel('lv_beta')">Lotka-Volterra (β)</button>
-  <button id="btn-fhn"                   onclick="switchModel('fhn')">FitzHugh-Nagumo (a)</button>
-  <button id="btn-fhn-I"                 onclick="switchModel('fhn_I')">FitzHugh-Nagumo (I)</button>
-</div>
-
-<div id="eq-panel" class="eq-panel"></div>
-
-<div class="container">
-  <div class="panel left">
-    <h2>Latent Space (z<sub>1</sub> vs z<sub>2</sub>)</h2>
-    <div id="latent-plot"></div>
-    <div class="legend" id="legend"></div>
-    <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode that latent point live (in-browser via ONNX). <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan, <strong>double-click</strong> to reset.</p>
+  <div class="switcher-bar">
+    <button id="btn-lv" class="active" onclick="switchModel('lv')">Lotka-Volterra (α)</button>
+    <button id="btn-lv-gamma" onclick="switchModel('lv_gamma')">Lotka-Volterra (γ)</button>
+    <button id="btn-lv-beta" onclick="switchModel('lv_beta')">Lotka-Volterra (β)</button>
+    <button id="btn-fhn" onclick="switchModel('fhn')">FitzHugh-Nagumo (a)</button>
+    <button id="btn-fhn-I" onclick="switchModel('fhn_I')">FitzHugh-Nagumo (I)</button>
   </div>
-  <div class="middle">
-    <div class="panel feat-panel">
-      <h2><span id="amp-title">Amplitude vs parameter</span></h2>
-      <div id="amp-plot"></div>
-      <div class="decoded-label" id="amp-label"></div>
+
+  <div id="eq-panel" class="eq-panel"></div>
+
+  <div class="container">
+    <div class="panel left">
+      <h2>Latent Space (z<sub>1</sub> vs z<sub>2</sub>)</h2>
+      <div id="latent-plot"></div>
+      <div class="legend" id="legend"></div>
+      <p class="info">Click a <strong>dot</strong> to view its trajectory. Click <strong>empty space</strong> to decode
+        that latent point live (in-browser via ONNX). <strong>Scroll</strong> to zoom, <strong>drag</strong> to pan,
+        <strong>double-click</strong> to reset.
+      </p>
     </div>
-    <div class="panel feat-panel">
-      <h2><span id="phase-title">Phase angle vs parameter</span></h2>
-      <div id="phase-plot"></div>
-      <div class="decoded-label" id="phase-label"></div>
+    <div class="middle">
+      <div class="panel feat-panel">
+        <h2><span id="amp-title">Amplitude vs parameter</span></h2>
+        <div id="amp-plot"></div>
+        <div class="decoded-label" id="amp-label"></div>
+      </div>
+      <div class="panel feat-panel">
+        <h2><span id="phase-title">Phase angle vs parameter</span></h2>
+        <div id="phase-plot"></div>
+        <div class="decoded-label" id="phase-label"></div>
+      </div>
+    </div>
+    <div class="right">
+      <div class="panel traj-panel">
+        <h2 id="ch1-label">Prey x<sub>1</sub>(t)</h2>
+        <div id="prey-plot"></div>
+        <div class="decoded-label" id="prey-label"></div>
+      </div>
+      <div class="panel traj-panel">
+        <h2 id="ch2-label">Predator x<sub>2</sub>(t)</h2>
+        <div id="pred-plot"></div>
+        <div class="decoded-label" id="pred-label"></div>
+      </div>
     </div>
   </div>
-  <div class="right">
-    <div class="panel traj-panel">
-      <h2 id="ch1-label">Prey x<sub>1</sub>(t)</h2>
-      <div id="prey-plot"></div>
-      <div class="decoded-label" id="prey-label"></div>
-    </div>
-    <div class="panel traj-panel">
-      <h2 id="ch2-label">Predator x<sub>2</sub>(t)</h2>
-      <div id="pred-plot"></div>
-      <div class="decoded-label" id="pred-label"></div>
-    </div>
-  </div>
-</div>
 
-<script>
-const W = 460, H = 400;
-const margin = {top: 20, right: 20, bottom: 40, left: 50};
-const tw = 440, th = 160;
-const tm = {top: 10, right: 20, bottom: 30, left: 55};
-const fw = 380, fh = 190;
-const fm = {top: 14, right: 18, bottom: 32, left: 50};
+  <script>
+    const W = 460, H = 400;
+    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    const tw = 440, th = 160;
+    const tm = { top: 10, right: 20, bottom: 30, left: 55 };
+    const fw = 380, fh = 190;
+    const fm = { top: 14, right: 18, bottom: 32, left: 50 };
 
-// Compute amplitude (peak-to-peak / 2 of channel 1) and phase lag of channel 2
-// relative to channel 1, expressed in radians of one period. Drops the first 20%
-// of the window as transient. Period is estimated from the autocorrelation of ch1.
-function paramFeatures(ch1, ch2) {
-  const n = ch1.length;
-  const skip = Math.floor(n / 5);
-  const np = n - skip;
-  if (np < 8) return { amplitude: 0, phase: 0 };
+    // Compute amplitude (peak-to-peak / 2 of channel 1) and phase lag of channel 2
+    // relative to channel 1, expressed in radians of one period. Drops the first 20%
+    // of the window as transient. Period is estimated from the autocorrelation of ch1.
+    function paramFeatures(ch1, ch2) {
+      const n = ch1.length;
+      const skip = Math.floor(n / 5);
+      const np = n - skip;
+      if (np < 8) return { amplitude: 0, phase: 0 };
 
-  let sumP = 0, sumQ = 0, minP = ch1[skip], maxP = ch1[skip];
-  for (let i = skip; i < n; i++) {
-    const v = ch1[i];
-    sumP += v; sumQ += ch2[i];
-    if (v < minP) minP = v;
-    if (v > maxP) maxP = v;
-  }
-  const meanP = sumP / np, meanQ = sumQ / np;
-  const amplitude = 0.5 * (maxP - minP);
+      let sumP = 0, sumQ = 0, minP = ch1[skip], maxP = ch1[skip];
+      for (let i = skip; i < n; i++) {
+        const v = ch1[i];
+        sumP += v; sumQ += ch2[i];
+        if (v < minP) minP = v;
+        if (v > maxP) maxP = v;
+      }
+      const meanP = sumP / np, meanQ = sumQ / np;
+      const amplitude = 0.5 * (maxP - minP);
 
-  const pc = new Array(np), qc = new Array(np);
-  for (let i = 0; i < np; i++) {
-    pc[i] = ch1[skip + i] - meanP;
-    qc[i] = ch2[skip + i] - meanQ;
-  }
+      const pc = new Array(np), qc = new Array(np);
+      for (let i = 0; i < np; i++) {
+        pc[i] = ch1[skip + i] - meanP;
+        qc[i] = ch2[skip + i] - meanQ;
+      }
 
-  // Period estimate: first local max of autocorrelation of pc after lag 0
-  function ac(lag) { let s = 0; for (let i = lag; i < np; i++) s += pc[i] * pc[i - lag]; return s; }
-  const maxLag = Math.floor(np / 2);
-  let prev = ac(0), curr = ac(1), period = 0;
-  for (let lag = 2; lag <= maxLag; lag++) {
-    const next = ac(lag);
-    if (curr > prev && curr > next && curr > 0) { period = lag - 1; break; }
-    prev = curr; curr = next;
-  }
-  if (period < 2) return { amplitude, phase: 0 };
+      // Period estimate: first local max of autocorrelation of pc after lag 0
+      function ac(lag) { let s = 0; for (let i = lag; i < np; i++) s += pc[i] * pc[i - lag]; return s; }
+      const maxLag = Math.floor(np / 2);
+      let prev = ac(0), curr = ac(1), period = 0;
+      for (let lag = 2; lag <= maxLag; lag++) {
+        const next = ac(lag);
+        if (curr > prev && curr > next && curr > 0) { period = lag - 1; break; }
+        prev = curr; curr = next;
+      }
+      if (period < 2) return { amplitude, phase: 0 };
 
-  // Phase lag from cross-correlation, restricted to ± half-period
-  const half = Math.floor(period / 2);
-  let bestLag = 0, bestX = -Infinity;
-  for (let lag = -half; lag <= half; lag++) {
-    let s = 0;
-    const lo = Math.max(0, lag);
-    const hi = Math.min(np, np + lag);
-    for (let i = lo; i < hi; i++) s += qc[i] * pc[i - lag];
-    if (s > bestX) { bestX = s; bestLag = lag; }
-  }
-  let phase = 2 * Math.PI * bestLag / period;
-  // Wrap to (-π, π]
-  phase = ((phase + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-  return { amplitude, phase };
-}
+      // Phase lag from cross-correlation, restricted to ± half-period
+      const half = Math.floor(period / 2);
+      let bestLag = 0, bestX = -Infinity;
+      for (let lag = -half; lag <= half; lag++) {
+        let s = 0;
+        const lo = Math.max(0, lag);
+        const hi = Math.min(np, np + lag);
+        for (let i = lo; i < hi; i++) s += qc[i] * pc[i - lag];
+        if (s > bestX) { bestX = s; bestLag = lag; }
+      }
+      let phase = 2 * Math.PI * bestLag / period;
+      // Wrap to (-π, π]
+      phase = ((phase + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+      return { amplitude, phase };
+    }
 
-const MODELS = {
-  lv: {
-    dataUrl:    'data_for_d3.json',
-    onnxUrl:    '../models/decoder.onnx',
-    title:      'Lotka-Volterra VAE Latent Space Explorer (α varies)',
-    ch1:        'Prey x<sub>1</sub>(t)',
-    ch2:        'Predator x<sub>2</sub>(t)',
-    paramLabel: '\u03b1',
-    colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
-    precision:  1,
-    eqHtml: `
+    const MODELS = {
+      lv: {
+        dataUrl: 'data_for_d3.json',
+        onnxUrl: '../models/decoder.onnx',
+        title: 'Lotka-Volterra VAE Latent Space Explorer (α varies)',
+        ch1: 'Prey x<sub>1</sub>(t)',
+        ch2: 'Predator x<sub>2</sub>(t)',
+        paramLabel: '\u03b1',
+        colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
+        precision: 1,
+        eqHtml: `
       <div class="eq-block">
-        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-title">Lotka-Volterra</div>
         <div class="eq-body">
           $\\dfrac{dx_1}{dt} = {\\color{#ffd166}{\\alpha}}\\, x_1 - \\beta\\, x_1 x_2$<br>
           $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - \\gamma\\, x_2$
@@ -229,19 +376,19 @@ const MODELS = {
           Fixed: β = δ = 0.02,&ensp;γ = 0.4,&ensp;x₀ = (10, 10)
         </div>
       </div>`,
-  },
-  lv_gamma: {
-    dataUrl:    'lv_gamma_data_for_d3.json',
-    onnxUrl:    '../models/lv_gamma_decoder.onnx',
-    title:      'Lotka-Volterra VAE Latent Space Explorer (\u03b3 varies)',
-    ch1:        'Prey x<sub>1</sub>(t)',
-    ch2:        'Predator x<sub>2</sub>(t)',
-    paramLabel: '\u03b3',
-    colorScale: t => d3.hsl(260, 0.7 + t * 0.3, 0.8 - t * 0.5).toString(),
-    precision:  1,
-    eqHtml: `
+      },
+      lv_gamma: {
+        dataUrl: 'lv_gamma_data_for_d3.json',
+        onnxUrl: '../models/lv_gamma_decoder.onnx',
+        title: 'Lotka-Volterra VAE Latent Space Explorer (\u03b3 varies)',
+        ch1: 'Prey x<sub>1</sub>(t)',
+        ch2: 'Predator x<sub>2</sub>(t)',
+        paramLabel: '\u03b3',
+        colorScale: t => d3.hsl(260, 0.7 + t * 0.3, 0.8 - t * 0.5).toString(),
+        precision: 1,
+        eqHtml: `
       <div class="eq-block">
-        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-title">Lotka-Volterra</div>
         <div class="eq-body">
           $\\dfrac{dx_1}{dt} = \\alpha\\, x_1 - \\beta\\, x_1 x_2$<br>
           $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - {\\color{#ffd166}{\\gamma}}\\, x_2$
@@ -251,19 +398,19 @@ const MODELS = {
           Fixed: α = 0.4,&ensp;β = δ = 0.02,&ensp;x₀ = (10, 10)
         </div>
       </div>`,
-  },
-  lv_beta: {
-    dataUrl:    'lv_beta_data_for_d3.json',
-    onnxUrl:    '../models/lv_beta_decoder.onnx',
-    title:      'Lotka-Volterra VAE Latent Space Explorer (\u03b2 varies)',
-    ch1:        'Prey x<sub>1</sub>(t)',
-    ch2:        'Predator x<sub>2</sub>(t)',
-    paramLabel: '\u03b2',
-    colorScale: t => d3.hsl(130, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
-    precision:  2,
-    eqHtml: `
+      },
+      lv_beta: {
+        dataUrl: 'lv_beta_data_for_d3.json',
+        onnxUrl: '../models/lv_beta_decoder.onnx',
+        title: 'Lotka-Volterra VAE Latent Space Explorer (\u03b2 varies)',
+        ch1: 'Prey x<sub>1</sub>(t)',
+        ch2: 'Predator x<sub>2</sub>(t)',
+        paramLabel: '\u03b2',
+        colorScale: t => d3.hsl(130, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
       <div class="eq-block">
-        <div class="eq-title">Governing equations — Lotka-Volterra</div>
+        <div class="eq-title">Lotka-Volterra</div>
         <div class="eq-body">
           $\\dfrac{dx_1}{dt} = \\alpha\\, x_1 - {\\color{#ffd166}{\\beta}}\\, x_1 x_2$<br>
           $\\dfrac{dx_2}{dt} = \\delta\\, x_1 x_2 - \\gamma\\, x_2$
@@ -273,19 +420,19 @@ const MODELS = {
           Fixed: α = 0.4,&ensp;δ = 0.02,&ensp;γ = 0.4,&ensp;x₀ = (10, 10)
         </div>
       </div>`,
-  },
-  fhn: {
-    dataUrl:    'fhn_data_for_d3.json',
-    onnxUrl:    '../models/fhn_decoder.onnx',
-    title:      'FitzHugh-Nagumo VAE Latent Space Explorer (a varies)',
-    ch1:        'Membrane voltage v(t)',
-    ch2:        'Recovery variable w(t)',
-    paramLabel: 'a',
-    colorScale: t => d3.hsl(185, 0.5 + t * 0.5, 0.75 - t * 0.4).toString(),
-    precision:  2,
-    eqHtml: `
+      },
+      fhn: {
+        dataUrl: 'fhn_data_for_d3.json',
+        onnxUrl: '../models/fhn_decoder.onnx',
+        title: 'FitzHugh-Nagumo VAE Latent Space Explorer (a varies)',
+        ch1: 'Membrane voltage v(t)',
+        ch2: 'Recovery variable w(t)',
+        paramLabel: 'a',
+        colorScale: t => d3.hsl(185, 0.5 + t * 0.5, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
       <div class="eq-block">
-        <div class="eq-title">Governing equations — FitzHugh-Nagumo</div>
+        <div class="eq-title">FitzHugh-Nagumo</div>
         <div class="eq-body">
           $\\dfrac{dv}{dt} = v - \\dfrac{v^3}{3} - w + I$<br>
           $\\dfrac{dw}{dt} = \\tau\\left(v + {\\color{#ffd166}{a}} - b\\,w\\right)$
@@ -295,19 +442,19 @@ const MODELS = {
           Fixed: b = 0.8,&ensp;τ = 0.4,&ensp;I = 0.5,&ensp;(v₀, w₀) = (0, 0)
         </div>
       </div>`,
-  },
-  fhn_I: {
-    dataUrl:    'fhn_I_data_for_d3.json',
-    onnxUrl:    '../models/fhn_I_decoder.onnx',
-    title:      'FitzHugh-Nagumo VAE Latent Space Explorer (I varies)',
-    ch1:        'Membrane voltage v(t)',
-    ch2:        'Recovery variable w(t)',
-    paramLabel: 'I',
-    colorScale: t => d3.hsl(30, 0.5 + t * 0.5, 0.8 - t * 0.45).toString(),
-    precision:  2,
-    eqHtml: `
+      },
+      fhn_I: {
+        dataUrl: 'fhn_I_data_for_d3.json',
+        onnxUrl: '../models/fhn_I_decoder.onnx',
+        title: 'FitzHugh-Nagumo VAE Latent Space Explorer (I varies)',
+        ch1: 'Membrane voltage v(t)',
+        ch2: 'Recovery variable w(t)',
+        paramLabel: 'I',
+        colorScale: t => d3.hsl(30, 0.5 + t * 0.5, 0.8 - t * 0.45).toString(),
+        precision: 2,
+        eqHtml: `
       <div class="eq-block">
-        <div class="eq-title">Governing equations — FitzHugh-Nagumo</div>
+        <div class="eq-title">FitzHugh-Nagumo</div>
         <div class="eq-body">
           $\\dfrac{dv}{dt} = v - \\dfrac{v^3}{3} - w + {\\color{#ffd166}{I}}$<br>
           $\\dfrac{dw}{dt} = \\tau\\left(v + a - b\\,w\\right)$
@@ -317,91 +464,91 @@ const MODELS = {
           Fixed: a = 0.7,&ensp;b = 0.8,&ensp;τ = 0.4,&ensp;(v₀, w₀) = (0, 0)
         </div>
       </div>`,
-  },
-};
+      },
+    };
 
-let currentModel = 'lv';
-let cache = {};
+    let currentModel = 'lv';
+    let cache = {};
 
-async function loadModel(id) {
-  if (cache[id]) return;
-  const cfg = MODELS[id];
-  const [data, session] = await Promise.all([
-    d3.json(cfg.dataUrl),
-    ort.InferenceSession.create(cfg.onnxUrl),
-  ]);
-  cache[id] = { data, session };
-}
+    async function loadModel(id) {
+      if (cache[id]) return;
+      const cfg = MODELS[id];
+      const [data, session] = await Promise.all([
+        d3.json(cfg.dataUrl),
+        ort.InferenceSession.create(cfg.onnxUrl),
+      ]);
+      cache[id] = { data, session };
+    }
 
-async function switchModel(id) {
-  if (id === currentModel) return;
-  await loadModel(id);
-  currentModel = id;
-  document.getElementById('btn-lv').classList.toggle('active', id === 'lv');
-  document.getElementById('btn-lv-gamma').classList.toggle('active', id === 'lv_gamma');
-  document.getElementById('btn-lv-beta').classList.toggle('active', id === 'lv_beta');
-  document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
-  document.getElementById('btn-fhn-I').classList.toggle('active', id === 'fhn_I');
-  render(id);
-}
+    async function switchModel(id) {
+      if (id === currentModel) return;
+      await loadModel(id);
+      currentModel = id;
+      document.getElementById('btn-lv').classList.toggle('active', id === 'lv');
+      document.getElementById('btn-lv-gamma').classList.toggle('active', id === 'lv_gamma');
+      document.getElementById('btn-lv-beta').classList.toggle('active', id === 'lv_beta');
+      document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
+      document.getElementById('btn-fhn-I').classList.toggle('active', id === 'fhn_I');
+      render(id);
+    }
 
-function render(id) {
-  const cfg = MODELS[id];
-  const { data, session } = cache[id];
-  const { samples, x_mean, x_std, meta } = data;
+    function render(id) {
+      const cfg = MODELS[id];
+      const { data, session } = cache[id];
+      const { samples, x_mean, x_std, meta } = data;
 
-  // Update labels
-  document.getElementById('main-title').textContent = cfg.title;
-  document.getElementById('ch1-label').innerHTML = cfg.ch1;
-  document.getElementById('ch2-label').innerHTML = cfg.ch2;
+      // Update labels
+      document.getElementById('main-title').textContent = cfg.title;
+      document.getElementById('ch1-label').innerHTML = cfg.ch1;
+      document.getElementById('ch2-label').innerHTML = cfg.ch2;
 
-  // Update equation panel and re-typeset MathJax
-  const eqPanel = document.getElementById('eq-panel');
-  eqPanel.innerHTML = cfg.eqHtml;
-  if (window.MathJax && MathJax.typesetPromise) {
-    MathJax.typesetPromise([eqPanel]).catch(err => console.warn('MathJax error', err));
-  }
+      // Update equation panel and re-typeset MathJax
+      const eqPanel = document.getElementById('eq-panel');
+      eqPanel.innerHTML = cfg.eqHtml;
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([eqPanel]).catch(err => console.warn('MathJax error', err));
+      }
 
-  const xMean = Float32Array.from(x_mean);
-  const xStd  = Float32Array.from(x_std);
+      const xMean = Float32Array.from(x_mean);
+      const xStd = Float32Array.from(x_std);
 
-  // Sequential color scale: normalise alpha to [0,1] then apply per-model ramp
-  const alphaVals = meta.alphas.map(a => +a.toFixed(cfg.precision));
-  const alphaMin = d3.min(alphaVals), alphaMax = d3.max(alphaVals);
-  const color = a => cfg.colorScale((a - alphaMin) / (alphaMax - alphaMin));
+      // Sequential color scale: normalise alpha to [0,1] then apply per-model ramp
+      const alphaVals = meta.alphas.map(a => +a.toFixed(cfg.precision));
+      const alphaMin = d3.min(alphaVals), alphaMax = d3.max(alphaVals);
+      const color = a => cfg.colorScale((a - alphaMin) / (alphaMax - alphaMin));
 
-  // Forward declarations — feature plot helpers are assigned in the feature
-  // plot block below. Latent-plot click handlers call them via these closures.
-  let highlightFeatById  = () => {};
-  let clearFeatHighlight = () => {};
-  let setDecodedFeat     = () => {};
-  let clearDecodedFeat   = () => {};
+      // Forward declarations — feature plot helpers are assigned in the feature
+      // plot block below. Latent-plot click handlers call them via these closures.
+      let highlightFeatById = () => { };
+      let clearFeatHighlight = () => { };
+      let setDecodedFeat = () => { };
+      let clearDecodedFeat = () => { };
 
-  // Clear previous plots
-  d3.select('#latent-plot').selectAll('*').remove();
-  d3.select('#legend').selectAll('*').remove();
-  d3.select('#prey-plot').selectAll('*').remove();
-  d3.select('#pred-plot').selectAll('*').remove();
-  d3.select('#amp-plot').selectAll('*').remove();
-  d3.select('#phase-plot').selectAll('*').remove();
-  d3.select('#prey-label').text('');
-  d3.select('#pred-label').text('');
-  d3.select('#amp-label').text('');
-  d3.select('#phase-label').text('');
+      // Clear previous plots
+      d3.select('#latent-plot').selectAll('*').remove();
+      d3.select('#legend').selectAll('*').remove();
+      d3.select('#prey-plot').selectAll('*').remove();
+      d3.select('#pred-plot').selectAll('*').remove();
+      d3.select('#amp-plot').selectAll('*').remove();
+      d3.select('#phase-plot').selectAll('*').remove();
+      d3.select('#prey-label').text('');
+      d3.select('#pred-label').text('');
+      d3.select('#amp-label').text('');
+      d3.select('#phase-label').text('');
 
-  // Update feature-plot titles with the model's parameter symbol
-  document.getElementById('amp-title').innerHTML   = `Amplitude vs ${cfg.paramLabel}`;
-  document.getElementById('phase-title').innerHTML = `Phase angle vs ${cfg.paramLabel}`;
+      // Update feature-plot titles with the model's parameter symbol
+      document.getElementById('amp-title').innerHTML = `Amplitude vs ${cfg.paramLabel}`;
+      document.getElementById('phase-title').innerHTML = `Phase angle vs ${cfg.paramLabel}`;
 
-  // --- Legend: gradient bar ---
-  const legend = d3.select('#legend');
-  const gradId = `grad-${id}`;
-  // build inline SVG gradient legend
-  const stops = alphaVals.map(a => {
-    const t = (a - alphaMin) / (alphaMax - alphaMin);
-    return `<stop offset="${(t * 100).toFixed(1)}%" stop-color="${cfg.colorScale(t)}"/>`;
-  }).join('');
-  legend.html(`
+      // --- Legend: gradient bar ---
+      const legend = d3.select('#legend');
+      const gradId = `grad-${id}`;
+      // build inline SVG gradient legend
+      const stops = alphaVals.map(a => {
+        const t = (a - alphaMin) / (alphaMax - alphaMin);
+        return `<stop offset="${(t * 100).toFixed(1)}%" stop-color="${cfg.colorScale(t)}"/>`;
+      }).join('');
+      legend.html(`
     <svg width="200" height="36" style="overflow:visible">
       <defs>
         <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -414,334 +561,335 @@ function render(id) {
     </svg>
   `);
 
-  // --- Latent Space Plot ---
-  const xScale = d3.scaleLinear().domain(meta.z1_range).range([margin.left, W - margin.right]);
-  const yScale = d3.scaleLinear().domain(meta.z2_range).range([H - margin.bottom, margin.top]);
+      // --- Latent Space Plot ---
+      const xScale = d3.scaleLinear().domain(meta.z1_range).range([margin.left, W - margin.right]);
+      const yScale = d3.scaleLinear().domain(meta.z2_range).range([H - margin.bottom, margin.top]);
 
-  const svg = d3.select('#latent-plot').append('svg')
-    .attr('width', W).attr('height', H);
+      const svg = d3.select('#latent-plot').append('svg')
+        .attr('width', W).attr('height', H);
 
-  // Clip path so dots don't overflow on zoom
-  svg.append('defs').append('clipPath').attr('id', 'clip')
-    .append('rect')
-    .attr('x', margin.left).attr('y', margin.top)
-    .attr('width', W - margin.left - margin.right)
-    .attr('height', H - margin.top - margin.bottom);
+      // Clip path so dots don't overflow on zoom
+      svg.append('defs').append('clipPath').attr('id', 'clip')
+        .append('rect')
+        .attr('x', margin.left).attr('y', margin.top)
+        .attr('width', W - margin.left - margin.right)
+        .attr('height', H - margin.top - margin.bottom);
 
-  // Background rect for click detection
-  svg.append('rect')
-    .attr('class', 'grid-cell')
-    .attr('x', margin.left).attr('y', margin.top)
-    .attr('width', W - margin.left - margin.right)
-    .attr('height', H - margin.top - margin.bottom)
-    .attr('fill', '#0f1a30')
-    .on('click', function(event) {
-      const [mx, my] = d3.pointer(event);
-      const z1 = xScale.invert(mx);
-      const z2 = yScale.invert(my);
-      decodeAt(z1, z2);
-    });
+      // Background rect for click detection
+      svg.append('rect')
+        .attr('class', 'grid-cell')
+        .attr('x', margin.left).attr('y', margin.top)
+        .attr('width', W - margin.left - margin.right)
+        .attr('height', H - margin.top - margin.bottom)
+        .attr('fill', '#0f1a30')
+        .on('click', function (event) {
+          const [mx, my] = d3.pointer(event);
+          const z1 = xScale.invert(mx);
+          const z2 = yScale.invert(my);
+          decodeAt(z1, z2);
+        });
 
-  // Axes (saved as variables for zoom updates)
-  const xAxisG = svg.append('g')
-    .attr('transform', `translate(0,${H - margin.bottom})`)
-    .call(d3.axisBottom(xScale).ticks(6));
-  xAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
-  const yAxisG = svg.append('g')
-    .attr('transform', `translate(${margin.left},0)`)
-    .call(d3.axisLeft(yScale).ticks(6));
-  yAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+      // Axes (saved as variables for zoom updates)
+      const xAxisG = svg.append('g')
+        .attr('transform', `translate(0,${H - margin.bottom})`)
+        .call(d3.axisBottom(xScale).ticks(6));
+      xAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+      const yAxisG = svg.append('g')
+        .attr('transform', `translate(${margin.left},0)`)
+        .call(d3.axisLeft(yScale).ticks(6));
+      yAxisG.selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
 
-  // Axis labels
-  svg.append('text').attr('x', W / 2).attr('y', H - 2)
-    .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem').text('z\u2081');
-  svg.append('text').attr('x', 14).attr('y', H / 2)
-    .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem')
-    .attr('transform', `rotate(-90,14,${H/2})`).text('z\u2082');
+      // Axis labels
+      svg.append('text').attr('x', W / 2).attr('y', H - 2)
+        .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem').text('z\u2081');
+      svg.append('text').attr('x', 14).attr('y', H / 2)
+        .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.8rem')
+        .attr('transform', `rotate(-90,14,${H / 2})`).text('z\u2082');
 
-  // Crosshair
-  const crossV = svg.append('line').attr('class', 'crosshair')
-    .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
-  const crossH = svg.append('line').attr('class', 'crosshair')
-    .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
+      // Crosshair
+      const crossV = svg.append('line').attr('class', 'crosshair')
+        .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
+      const crossH = svg.append('line').attr('class', 'crosshair')
+        .attr('stroke', '#ffd16644').attr('stroke-dasharray', '3,3');
 
-  // Sample dots (in clipped group for zoom)
-  const dotGroup = svg.append('g').attr('clip-path', 'url(#clip)');
-  dotGroup.selectAll('.sample-dot')
-    .data(samples)
-    .join('circle')
-    .attr('class', 'sample-dot')
-    .attr('cx', d => xScale(d.z[0]))
-    .attr('cy', d => yScale(d.z[1]))
-    .attr('r', 7)
-    .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
-    .attr('stroke', '#fff')
-    .attr('stroke-width', 1.5)
-    .attr('opacity', 0.9)
-    .on('click', function(event, d) {
-      event.stopPropagation();
-      highlightDot(this);
-      highlightFeatById(d.id);
-      clearDecodedFeat();
-      showTrajectory(d.prey, d.predator,
-        `Sample #${d.id} (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
-        color(+d.alpha.toFixed(cfg.precision)));
-      moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
-    });
-
-  // --- Zoom behavior ---
-  const xScale0 = xScale.copy();
-  const yScale0 = yScale.copy();
-
-  const zoom = d3.zoom()
-    .scaleExtent([1, 20])
-    .translateExtent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
-    .extent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
-    .on('zoom', function(event) {
-      const newX = event.transform.rescaleX(xScale0);
-      const newY = event.transform.rescaleY(yScale0);
-      xScale.domain(newX.domain());
-      yScale.domain(newY.domain());
-
-      xAxisG.call(d3.axisBottom(xScale).ticks(6))
-        .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
-      yAxisG.call(d3.axisLeft(yScale).ticks(6))
-        .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
-
+      // Sample dots (in clipped group for zoom)
+      const dotGroup = svg.append('g').attr('clip-path', 'url(#clip)');
       dotGroup.selectAll('.sample-dot')
+        .data(samples)
+        .join('circle')
+        .attr('class', 'sample-dot')
         .attr('cx', d => xScale(d.z[0]))
-        .attr('cy', d => yScale(d.z[1]));
-    });
+        .attr('cy', d => yScale(d.z[1]))
+        .attr('r', 7)
+        .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 1.5)
+        .attr('opacity', 0.9)
+        .on('click', function (event, d) {
+          event.stopPropagation();
+          highlightDot(this);
+          highlightFeatById(d.id);
+          clearDecodedFeat();
+          showTrajectory(d.prey, d.predator,
+            `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+            color(+d.alpha.toFixed(cfg.precision)));
+          moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+        });
 
-  svg.call(zoom);
+      // --- Zoom behavior ---
+      const xScale0 = xScale.copy();
+      const yScale0 = yScale.copy();
 
-  // --- Trajectory Plots ---
-  function makeTrajectoryPlot(containerId) {
-    const s = d3.select(containerId).append('svg')
-      .attr('width', tw).attr('height', th);
-    s.append('g').attr('class', 'x-axis')
-      .attr('transform', `translate(0,${th - tm.bottom})`);
-    s.append('g').attr('class', 'y-axis')
-      .attr('transform', `translate(${tm.left},0)`);
-    s.append('path').attr('class', 'line')
-      .attr('fill', 'none').attr('stroke-width', 1.5);
-    s.append('text').attr('class', 'ax-label')
-      .attr('x', tw / 2).attr('y', th - 2)
-      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.75rem').text('Time');
-    return s;
-  }
+      const zoom = d3.zoom()
+        .scaleExtent([1, 20])
+        .translateExtent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
+        .extent([[margin.left, margin.top], [W - margin.right, H - margin.bottom]])
+        .on('zoom', function (event) {
+          const newX = event.transform.rescaleX(xScale0);
+          const newY = event.transform.rescaleY(yScale0);
+          xScale.domain(newX.domain());
+          yScale.domain(newY.domain());
 
-  const preySvg = makeTrajectoryPlot('#prey-plot');
-  const predSvg = makeTrajectoryPlot('#pred-plot');
+          xAxisG.call(d3.axisBottom(xScale).ticks(6))
+            .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
+          yAxisG.call(d3.axisLeft(yScale).ticks(6))
+            .selectAll('text, line, path').attr('stroke', '#666').attr('fill', '#888');
 
-  // --- Feature Plots: parameter vs amplitude, parameter vs phase ---
-  const features = samples.map(d => paramFeatures(d.prey, d.predator));
+          dotGroup.selectAll('.sample-dot')
+            .attr('cx', d => xScale(d.z[0]))
+            .attr('cy', d => yScale(d.z[1]));
+        });
 
-  const paramExtent = d3.extent(samples, d => d.alpha);
-  const paramPad = (paramExtent[1] - paramExtent[0]) * 0.06 || 0.05;
-  const ampExtent = d3.extent(features, f => f.amplitude);
-  const ampPad = (ampExtent[1] - ampExtent[0]) * 0.1 || 0.5;
+      svg.call(zoom);
 
-  function makeFeatPlot(containerId, xMin, xMax, yMin, yMax, xLabel, yLabel) {
-    const s = d3.select(containerId).append('svg')
-      .attr('width', fw).attr('height', fh);
-    const xS = d3.scaleLinear().domain([xMin, xMax]).range([fm.left, fw - fm.right]);
-    const yS = d3.scaleLinear().domain([yMin, yMax]).nice().range([fh - fm.bottom, fm.top]);
-    s.append('g')
-      .attr('transform', `translate(0,${fh - fm.bottom})`)
-      .call(d3.axisBottom(xS).ticks(5))
-      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
-    s.append('g')
-      .attr('transform', `translate(${fm.left},0)`)
-      .call(d3.axisLeft(yS).ticks(4))
-      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
-    s.append('text')
-      .attr('x', fw / 2).attr('y', fh - 4)
-      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
-      .text(xLabel);
-    s.append('text')
-      .attr('x', 12).attr('y', fh / 2)
-      .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
-      .attr('transform', `rotate(-90,12,${fh/2})`)
-      .text(yLabel);
-    return { svg: s, xS, yS };
-  }
+      // --- Trajectory Plots ---
+      function makeTrajectoryPlot(containerId) {
+        const s = d3.select(containerId).append('svg')
+          .attr('width', tw).attr('height', th);
+        s.append('g').attr('class', 'x-axis')
+          .attr('transform', `translate(0,${th - tm.bottom})`);
+        s.append('g').attr('class', 'y-axis')
+          .attr('transform', `translate(${tm.left},0)`);
+        s.append('path').attr('class', 'line')
+          .attr('fill', 'none').attr('stroke-width', 1.5);
+        s.append('text').attr('class', 'ax-label')
+          .attr('x', tw / 2).attr('y', th - 2)
+          .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.75rem').text('Time');
+        return s;
+      }
 
-  const ampPlot = makeFeatPlot('#amp-plot',
-    paramExtent[0] - paramPad, paramExtent[1] + paramPad,
-    ampExtent[0] - ampPad,    ampExtent[1] + ampPad,
-    cfg.paramLabel, 'Amplitude');
-  const phasePlot = makeFeatPlot('#phase-plot',
-    paramExtent[0] - paramPad, paramExtent[1] + paramPad,
-    -Math.PI, Math.PI,
-    cfg.paramLabel, 'Phase (rad)');
+      const preySvg = makeTrajectoryPlot('#prey-plot');
+      const predSvg = makeTrajectoryPlot('#pred-plot');
 
-  // Reference lines at -π/2, 0, π/2 on the phase plot
-  [-Math.PI / 2, 0, Math.PI / 2].forEach(yv => {
-    phasePlot.svg.append('line')
-      .attr('x1', fm.left).attr('x2', fw - fm.right)
-      .attr('y1', phasePlot.yS(yv)).attr('y2', phasePlot.yS(yv))
-      .attr('stroke', '#3a4a6e').attr('stroke-width', 0.7)
-      .attr('stroke-dasharray', yv === 0 ? null : '2,3');
-  });
+      // --- Feature Plots: parameter vs amplitude, parameter vs phase ---
+      const features = samples.map(d => paramFeatures(d.prey, d.predator));
 
-  function makeFeatDots(plot, getY) {
-    return plot.svg.selectAll('.feat-dot')
-      .data(samples)
-      .join('circle')
-      .attr('class', 'feat-dot sample-dot')
-      .attr('cx', d => plot.xS(d.alpha))
-      .attr('cy', (d, i) => plot.yS(getY(i)))
-      .attr('r', 4.5)
-      .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 1)
-      .attr('opacity', 0.85)
-      .on('click', function(event, d) {
-        event.stopPropagation();
-        // Find the matching latent dot and route through the standard handler
-        const lDot = dotGroup.selectAll('.sample-dot').nodes()
-          .find(node => d3.select(node).datum().id === d.id);
-        if (lDot) highlightDot(lDot);
-        highlightFeatById(d.id);
-        clearDecodedFeat();
+      const paramExtent = d3.extent(samples, d => d.alpha);
+      const paramPad = (paramExtent[1] - paramExtent[0]) * 0.06 || 0.05;
+      const ampExtent = d3.extent(features, f => f.amplitude);
+      const ampPad = (ampExtent[1] - ampExtent[0]) * 0.1 || 0.5;
+
+      function makeFeatPlot(containerId, xMin, xMax, yMin, yMax, xLabel, yLabel) {
+        const s = d3.select(containerId).append('svg')
+          .attr('width', fw).attr('height', fh);
+        const xS = d3.scaleLinear().domain([xMin, xMax]).range([fm.left, fw - fm.right]);
+        const yS = d3.scaleLinear().domain([yMin, yMax]).nice().range([fh - fm.bottom, fm.top]);
+        s.append('g')
+          .attr('transform', `translate(0,${fh - fm.bottom})`)
+          .call(d3.axisBottom(xS).ticks(5))
+          .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
+        s.append('g')
+          .attr('transform', `translate(${fm.left},0)`)
+          .call(d3.axisLeft(yS).ticks(4))
+          .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#888');
+        s.append('text')
+          .attr('x', fw / 2).attr('y', fh - 4)
+          .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
+          .text(xLabel);
+        s.append('text')
+          .attr('x', 12).attr('y', fh / 2)
+          .attr('text-anchor', 'middle').attr('fill', '#888').attr('font-size', '0.72rem')
+          .attr('transform', `rotate(-90,12,${fh / 2})`)
+          .text(yLabel);
+        return { svg: s, xS, yS };
+      }
+
+      const ampPlot = makeFeatPlot('#amp-plot',
+        paramExtent[0] - paramPad, paramExtent[1] + paramPad,
+        ampExtent[0] - ampPad, ampExtent[1] + ampPad,
+        cfg.paramLabel, 'Amplitude');
+      const phasePlot = makeFeatPlot('#phase-plot',
+        paramExtent[0] - paramPad, paramExtent[1] + paramPad,
+        -Math.PI, Math.PI,
+        cfg.paramLabel, 'Phase (rad)');
+
+      // Reference lines at -π/2, 0, π/2 on the phase plot
+      [-Math.PI / 2, 0, Math.PI / 2].forEach(yv => {
+        phasePlot.svg.append('line')
+          .attr('x1', fm.left).attr('x2', fw - fm.right)
+          .attr('y1', phasePlot.yS(yv)).attr('y2', phasePlot.yS(yv))
+          .attr('stroke', '#3a4a6e').attr('stroke-width', 0.7)
+          .attr('stroke-dasharray', yv === 0 ? null : '2,3');
+      });
+
+      function makeFeatDots(plot, getY) {
+        return plot.svg.selectAll('.feat-dot')
+          .data(samples)
+          .join('circle')
+          .attr('class', 'feat-dot sample-dot')
+          .attr('cx', d => plot.xS(d.alpha))
+          .attr('cy', (d, i) => plot.yS(getY(i)))
+          .attr('r', 4.5)
+          .attr('fill', d => color(+d.alpha.toFixed(cfg.precision)))
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 1)
+          .attr('opacity', 0.85)
+          .on('click', function (event, d) {
+            event.stopPropagation();
+            // Find the matching latent dot and route through the standard handler
+            const lDot = dotGroup.selectAll('.sample-dot').nodes()
+              .find(node => d3.select(node).datum().id === d.id);
+            if (lDot) highlightDot(lDot);
+            highlightFeatById(d.id);
+            clearDecodedFeat();
+            showTrajectory(d.prey, d.predator,
+              `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+              color(+d.alpha.toFixed(cfg.precision)));
+            moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
+          });
+      }
+      const ampDots = makeFeatDots(ampPlot, i => features[i].amplitude);
+      const phaseDots = makeFeatDots(phasePlot, i => features[i].phase);
+
+      // Decoded reference markers — hidden until user decodes a latent point
+      function makeDecodedRef(plot) {
+        const g = plot.svg.append('g').style('display', 'none');
+        g.append('line')
+          .attr('class', 'decoded-line')
+          .attr('x1', fm.left).attr('x2', fw - fm.right)
+          .attr('stroke', '#ffd166').attr('stroke-width', 1.2)
+          .attr('stroke-dasharray', '4,3');
+        g.append('circle')
+          .attr('class', 'decoded-marker')
+          .attr('cx', (fm.left + fw - fm.right) / 2)
+          .attr('r', 5).attr('fill', '#ffd166').attr('stroke', '#1a1a2e').attr('stroke-width', 1.5);
+        return g;
+      }
+      const ampDecodedRef = makeDecodedRef(ampPlot);
+      const phaseDecodedRef = makeDecodedRef(phasePlot);
+
+      // Wire up forward-declared helpers
+      highlightFeatById = (id) => {
+        [ampDots, phaseDots].forEach(sel => {
+          sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.6);
+          sel.filter(d => d.id === id)
+            .attr('stroke', '#ffd166').attr('stroke-width', 2.5).attr('r', 7).attr('opacity', 1);
+        });
+      };
+      clearFeatHighlight = () => {
+        [ampDots, phaseDots].forEach(sel =>
+          sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.85));
+      };
+      setDecodedFeat = (feat, label) => {
+        if (!feat) return;
+        const ay = ampPlot.yS(feat.amplitude);
+        const py = phasePlot.yS(feat.phase);
+        ampDecodedRef.style('display', null);
+        ampDecodedRef.select('.decoded-line').attr('y1', ay).attr('y2', ay);
+        ampDecodedRef.select('.decoded-marker').attr('cy', ay);
+        phaseDecodedRef.style('display', null);
+        phaseDecodedRef.select('.decoded-line').attr('y1', py).attr('y2', py);
+        phaseDecodedRef.select('.decoded-marker').attr('cy', py);
+        d3.select('#amp-label').text(`${label} → amplitude = ${feat.amplitude.toFixed(2)}`);
+        d3.select('#phase-label').text(`${label} → phase = ${feat.phase.toFixed(2)} rad`);
+        // Also dim training dots so the decoded reference stands out
+        [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.4));
+      };
+      clearDecodedFeat = () => {
+        ampDecodedRef.style('display', 'none');
+        phaseDecodedRef.style('display', 'none');
+        d3.select('#amp-label').text('');
+        d3.select('#phase-label').text('');
+        [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.85));
+      };
+
+      function drawLine(svgEl, values, lineColor, labelEl, label) {
+        const tVals = values.map((_, i) => i * meta.dt);
+        const xS = d3.scaleLinear().domain([0, d3.max(tVals)]).range([tm.left, tw - tm.right]);
+        const yS = d3.scaleLinear().domain(d3.extent(values)).nice().range([th - tm.bottom, tm.top]);
+
+        svgEl.select('.x-axis').call(d3.axisBottom(xS).ticks(5))
+          .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
+        svgEl.select('.y-axis').call(d3.axisLeft(yS).ticks(4))
+          .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
+
+        const line = d3.line().x((_, i) => xS(tVals[i])).y(d => yS(d));
+        svgEl.select('.line')
+          .datum(values)
+          .attr('d', line)
+          .attr('stroke', lineColor);
+
+        d3.select(labelEl).text(label);
+      }
+
+      function showTrajectory(prey, predator, label, lineColor) {
+        drawLine(preySvg, prey, lineColor, '#prey-label', label);
+        drawLine(predSvg, predator, lineColor, '#pred-label', label);
+      }
+
+      async function decodeAt(z1, z2) {
+        const zTensor = new ort.Tensor('float32', Float32Array.from([z1, z2]), [1, 2]);
+        const results = await session.run({ z: zTensor });
+        const recon = results.x_recon.data;
+        const prey = [];
+        const predator = [];
+        for (let i = 0; i < recon.length; i++) {
+          const raw = recon[i] * xStd[i] + xMean[i];
+          if (i % 2 === 0) prey.push(raw);
+          else predator.push(raw);
+        }
+        const label = `Decoded at z = [${z1.toFixed(2)}, ${z2.toFixed(2)}]`;
+        showTrajectory(prey, predator, label, '#ffd166');
+        moveCrosshair(xScale(z1), yScale(z2));
+        clearHighlight();
+        clearFeatHighlight();
+        setDecodedFeat(paramFeatures(prey, predator), label);
+      }
+
+      function moveCrosshair(cx, cy) {
+        crossV.attr('x1', cx).attr('x2', cx).attr('y1', margin.top).attr('y2', H - margin.bottom);
+        crossH.attr('x1', margin.left).attr('x2', W - margin.right).attr('y1', cy).attr('y2', cy);
+      }
+
+      let prevDot = null;
+      function highlightDot(el) {
+        if (prevDot) d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7);
+        d3.select(el).attr('stroke', '#ffd166').attr('stroke-width', 3).attr('r', 9);
+        prevDot = el;
+      }
+      function clearHighlight() {
+        if (prevDot) { d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7); prevDot = null; }
+      }
+
+      // Show first sample by default
+      if (samples.length > 0) {
+        const d = samples[0];
         showTrajectory(d.prey, d.predator,
-          `Sample #${d.id} (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
+          `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
           color(+d.alpha.toFixed(cfg.precision)));
         moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
-      });
-  }
-  const ampDots   = makeFeatDots(ampPlot,   i => features[i].amplitude);
-  const phaseDots = makeFeatDots(phasePlot, i => features[i].phase);
-
-  // Decoded reference markers — hidden until user decodes a latent point
-  function makeDecodedRef(plot) {
-    const g = plot.svg.append('g').style('display', 'none');
-    g.append('line')
-      .attr('class', 'decoded-line')
-      .attr('x1', fm.left).attr('x2', fw - fm.right)
-      .attr('stroke', '#ffd166').attr('stroke-width', 1.2)
-      .attr('stroke-dasharray', '4,3');
-    g.append('circle')
-      .attr('class', 'decoded-marker')
-      .attr('cx', (fm.left + fw - fm.right) / 2)
-      .attr('r', 5).attr('fill', '#ffd166').attr('stroke', '#1a1a2e').attr('stroke-width', 1.5);
-    return g;
-  }
-  const ampDecodedRef   = makeDecodedRef(ampPlot);
-  const phaseDecodedRef = makeDecodedRef(phasePlot);
-
-  // Wire up forward-declared helpers
-  highlightFeatById = (id) => {
-    [ampDots, phaseDots].forEach(sel => {
-      sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.6);
-      sel.filter(d => d.id === id)
-        .attr('stroke', '#ffd166').attr('stroke-width', 2.5).attr('r', 7).attr('opacity', 1);
-    });
-  };
-  clearFeatHighlight = () => {
-    [ampDots, phaseDots].forEach(sel =>
-      sel.attr('stroke', '#fff').attr('stroke-width', 1).attr('r', 4.5).attr('opacity', 0.85));
-  };
-  setDecodedFeat = (feat, label) => {
-    if (!feat) return;
-    const ay = ampPlot.yS(feat.amplitude);
-    const py = phasePlot.yS(feat.phase);
-    ampDecodedRef.style('display', null);
-    ampDecodedRef.select('.decoded-line').attr('y1', ay).attr('y2', ay);
-    ampDecodedRef.select('.decoded-marker').attr('cy', ay);
-    phaseDecodedRef.style('display', null);
-    phaseDecodedRef.select('.decoded-line').attr('y1', py).attr('y2', py);
-    phaseDecodedRef.select('.decoded-marker').attr('cy', py);
-    d3.select('#amp-label').text(`${label} → amplitude = ${feat.amplitude.toFixed(2)}`);
-    d3.select('#phase-label').text(`${label} → phase = ${feat.phase.toFixed(2)} rad`);
-    // Also dim training dots so the decoded reference stands out
-    [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.4));
-  };
-  clearDecodedFeat = () => {
-    ampDecodedRef.style('display', 'none');
-    phaseDecodedRef.style('display', 'none');
-    d3.select('#amp-label').text('');
-    d3.select('#phase-label').text('');
-    [ampDots, phaseDots].forEach(sel => sel.attr('opacity', 0.85));
-  };
-
-  function drawLine(svgEl, values, lineColor, labelEl, label) {
-    const tVals = values.map((_, i) => i * meta.dt);
-    const xS = d3.scaleLinear().domain([0, d3.max(tVals)]).range([tm.left, tw - tm.right]);
-    const yS = d3.scaleLinear().domain(d3.extent(values)).nice().range([th - tm.bottom, tm.top]);
-
-    svgEl.select('.x-axis').call(d3.axisBottom(xS).ticks(5))
-      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
-    svgEl.select('.y-axis').call(d3.axisLeft(yS).ticks(4))
-      .selectAll('text, line, path').attr('stroke', '#555').attr('fill', '#777');
-
-    const line = d3.line().x((_, i) => xS(tVals[i])).y(d => yS(d));
-    svgEl.select('.line')
-      .datum(values)
-      .attr('d', line)
-      .attr('stroke', lineColor);
-
-    d3.select(labelEl).text(label);
-  }
-
-  function showTrajectory(prey, predator, label, lineColor) {
-    drawLine(preySvg, prey, lineColor, '#prey-label', label);
-    drawLine(predSvg, predator, lineColor, '#pred-label', label);
-  }
-
-  async function decodeAt(z1, z2) {
-    const zTensor = new ort.Tensor('float32', Float32Array.from([z1, z2]), [1, 2]);
-    const results = await session.run({ z: zTensor });
-    const recon = results.x_recon.data;
-    const prey = [];
-    const predator = [];
-    for (let i = 0; i < recon.length; i++) {
-      const raw = recon[i] * xStd[i] + xMean[i];
-      if (i % 2 === 0) prey.push(raw);
-      else predator.push(raw);
+        highlightFeatById(d.id);
+      }
     }
-    const label = `Decoded at z = [${z1.toFixed(2)}, ${z2.toFixed(2)}]`;
-    showTrajectory(prey, predator, label, '#ffd166');
-    moveCrosshair(xScale(z1), yScale(z2));
-    clearHighlight();
-    clearFeatHighlight();
-    setDecodedFeat(paramFeatures(prey, predator), label);
-  }
 
-  function moveCrosshair(cx, cy) {
-    crossV.attr('x1', cx).attr('x2', cx).attr('y1', margin.top).attr('y2', H - margin.bottom);
-    crossH.attr('x1', margin.left).attr('x2', W - margin.right).attr('y1', cy).attr('y2', cy);
-  }
-
-  let prevDot = null;
-  function highlightDot(el) {
-    if (prevDot) d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7);
-    d3.select(el).attr('stroke', '#ffd166').attr('stroke-width', 3).attr('r', 9);
-    prevDot = el;
-  }
-  function clearHighlight() {
-    if (prevDot) { d3.select(prevDot).attr('stroke', '#fff').attr('stroke-width', 1.5).attr('r', 7); prevDot = null; }
-  }
-
-  // Show first sample by default
-  if (samples.length > 0) {
-    const d = samples[0];
-    showTrajectory(d.prey, d.predator,
-      `Sample #0 (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
-      color(+d.alpha.toFixed(cfg.precision)));
-    moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
-    highlightFeatById(d.id);
-  }
-}
-
-// Boot — show equations immediately, then load data
-const eqPanel = document.getElementById('eq-panel');
-eqPanel.innerHTML = MODELS['lv'].eqHtml;
-if (window.MathJax && MathJax.typesetPromise) {
-  MathJax.typesetPromise([eqPanel]).catch(() => {});
-}
-loadModel('lv').then(() => render('lv'));
-</script>
+    // Boot — show equations immediately, then load data
+    const eqPanel = document.getElementById('eq-panel');
+    eqPanel.innerHTML = MODELS['lv'].eqHtml;
+    if (window.MathJax && MathJax.typesetPromise) {
+      MathJax.typesetPromise([eqPanel]).catch(() => { });
+    }
+    loadModel('lv').then(() => render('lv'));
+  </script>
 </body>
+
 </html>

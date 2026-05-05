@@ -37,6 +37,7 @@ data/        generated datasets (.pt)
 models/      trained weights (.pt) and exported decoder .onnx files
 figures/     generated PNG plots (loss curves, etc.)
 web/         interactive D3 visualization (index.html, data_for_d3.json)
+evaluation/  quantitative evaluation script and results
 docs/        markdown docs, schema, original proposal
 ```
 
@@ -51,6 +52,7 @@ docs/        markdown docs, schema, original proposal
 | `src/export_for_d3.py` | Encodes the dataset and exports JSON + ONNX decoder for the browser — accepts `--model <key>` |
 | `src/plot_param_features.py` | Sweeps α and shows two interactive plots: parameter vs amplitude and parameter vs phase angle (live `plt.show()`, not saved) |
 | `web/index.html` | Interactive D3 latent-space explorer with model switcher; loads ONNX decoder client-side via onnxruntime-web |
+| `evaluation/evaluate.py` | Quantitative evaluation: reconstruction MSE on a held-out split and on freshly-integrated trajectories at unseen parameter values, latent→parameter R² (linear and kNN), and silhouette scores against fixed-point/limit-cycle behavioral labels. Writes `results.json`, `results.md`, and `metrics_summary.png`. |
 
 ## Usage
 
@@ -81,6 +83,25 @@ To run all five models end-to-end, use the pipeline script:
 ```bash
 bash run_pipeline.sh
 ```
+
+### Quantitative evaluation
+
+After all models are trained, run the evaluation to measure reconstruction
+quality, generalization to unseen parameter values, and latent space
+organization:
+
+```bash
+python evaluation/evaluate.py                      # all five models
+python evaluation/evaluate.py --model fitzhughnagumo_I   # one model
+```
+
+This writes `evaluation/results.json`, `evaluation/results.md` (a summary
+table with column definitions), and `evaluation/metrics_summary.png` (a
+side-by-side bar chart: reconstruction MSE held-out vs. unseen-parameter,
+and latent→parameter R² linear vs. kNN). Silhouette scores against
+fixed-point / limit-cycle behavioral labels are reported when both classes
+are present in the dataset (i.e. when the swept parameter crosses a
+bifurcation).
 
 ### Adding a new ODE model
 
