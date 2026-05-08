@@ -186,6 +186,41 @@
       font-weight: 600;
     }
 
+    /* Two-tier selector: family on top, parameter sweep below */
+    #family-bar { margin-bottom: 6px; }
+    #family-bar button { padding: 7px 18px; font-size: 0.85rem; font-weight: 500; }
+    #family-bar button.active { background: #ffd166; color: #1a1a2e; }
+    #param-bar  { margin-bottom: 12px; min-height: 28px; }
+    #param-bar  button { font-size: 0.78rem; padding: 5px 14px; }
+
+    .chaos-tag {
+      display: inline-block;
+      background: #c72c4180;
+      color: #ffd6dc;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .status-bar {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #ef476f;
+      margin: 0 24px 8px;
+      min-height: 1.2em;
+    }
+    .status-bar code {
+      background: #2a3a5e;
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: #ffd166;
+      font-size: 0.8rem;
+    }
+
     /* ── Equation panel ─────────────────────────────────────────── */
     .eq-panel {
       background: #16213e;
@@ -248,13 +283,9 @@
   <h1 id="main-title">Lotka-Volterra VAE Latent Space Explorer</h1>
   <p class="subtitle">Interactive exploration of ODE parameter spaces through VAE embeddings</p>
 
-  <div class="switcher-bar">
-    <button id="btn-lv" class="active" onclick="switchModel('lv')">Lotka-Volterra (α)</button>
-    <button id="btn-lv-gamma" onclick="switchModel('lv_gamma')">Lotka-Volterra (γ)</button>
-    <button id="btn-lv-beta" onclick="switchModel('lv_beta')">Lotka-Volterra (β)</button>
-    <button id="btn-fhn" onclick="switchModel('fhn')">FitzHugh-Nagumo (a)</button>
-    <button id="btn-fhn-I" onclick="switchModel('fhn_I')">FitzHugh-Nagumo (I)</button>
-  </div>
+  <div id="family-bar" class="switcher-bar"></div>
+  <div id="param-bar" class="switcher-bar"></div>
+  <div id="status-bar" class="status-bar"></div>
 
   <div id="eq-panel" class="eq-panel"></div>
 
@@ -280,18 +311,7 @@
         <div class="decoded-label" id="phase-label"></div>
       </div>
     </div>
-    <div class="right">
-      <div class="panel traj-panel">
-        <h2 id="ch1-label">Prey x<sub>1</sub>(t)</h2>
-        <div id="prey-plot"></div>
-        <div class="decoded-label" id="prey-label"></div>
-      </div>
-      <div class="panel traj-panel">
-        <h2 id="ch2-label">Predator x<sub>2</sub>(t)</h2>
-        <div id="pred-plot"></div>
-        <div class="decoded-label" id="pred-label"></div>
-      </div>
-    </div>
+    <div class="right" id="trajectory-container"></div>
   </div>
 
   <script>
@@ -356,11 +376,11 @@
 
     const MODELS = {
       lv: {
+        family: 'Lotka-Volterra', paramSymbol: 'α',
         dataUrl: 'data_for_d3.json',
         onnxUrl: '../models/decoder.onnx',
         title: 'Lotka-Volterra VAE Latent Space Explorer (α varies)',
-        ch1: 'Prey x<sub>1</sub>(t)',
-        ch2: 'Predator x<sub>2</sub>(t)',
+        channelLabels: ['Prey x<sub>1</sub>(t)', 'Predator x<sub>2</sub>(t)'],
         paramLabel: '\u03b1',
         colorScale: t => d3.hsl(0, t * 1, 1 - t * 0.7).toString(),
         precision: 1,
@@ -378,11 +398,11 @@
       </div>`,
       },
       lv_gamma: {
+        family: 'Lotka-Volterra', paramSymbol: 'γ',
         dataUrl: 'lv_gamma_data_for_d3.json',
         onnxUrl: '../models/lv_gamma_decoder.onnx',
         title: 'Lotka-Volterra VAE Latent Space Explorer (\u03b3 varies)',
-        ch1: 'Prey x<sub>1</sub>(t)',
-        ch2: 'Predator x<sub>2</sub>(t)',
+        channelLabels: ['Prey x<sub>1</sub>(t)', 'Predator x<sub>2</sub>(t)'],
         paramLabel: '\u03b3',
         colorScale: t => d3.hsl(260, 0.7 + t * 0.3, 0.8 - t * 0.5).toString(),
         precision: 1,
@@ -400,11 +420,11 @@
       </div>`,
       },
       lv_beta: {
+        family: 'Lotka-Volterra', paramSymbol: 'β',
         dataUrl: 'lv_beta_data_for_d3.json',
         onnxUrl: '../models/lv_beta_decoder.onnx',
         title: 'Lotka-Volterra VAE Latent Space Explorer (\u03b2 varies)',
-        ch1: 'Prey x<sub>1</sub>(t)',
-        ch2: 'Predator x<sub>2</sub>(t)',
+        channelLabels: ['Prey x<sub>1</sub>(t)', 'Predator x<sub>2</sub>(t)'],
         paramLabel: '\u03b2',
         colorScale: t => d3.hsl(130, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
         precision: 2,
@@ -422,11 +442,11 @@
       </div>`,
       },
       fhn: {
+        family: 'FitzHugh-Nagumo', paramSymbol: 'a',
         dataUrl: 'fhn_data_for_d3.json',
         onnxUrl: '../models/fhn_decoder.onnx',
         title: 'FitzHugh-Nagumo VAE Latent Space Explorer (a varies)',
-        ch1: 'Membrane voltage v(t)',
-        ch2: 'Recovery variable w(t)',
+        channelLabels: ['Membrane voltage v(t)', 'Recovery variable w(t)'],
         paramLabel: 'a',
         colorScale: t => d3.hsl(185, 0.5 + t * 0.5, 0.75 - t * 0.4).toString(),
         precision: 2,
@@ -444,11 +464,11 @@
       </div>`,
       },
       fhn_I: {
+        family: 'FitzHugh-Nagumo', paramSymbol: 'I',
         dataUrl: 'fhn_I_data_for_d3.json',
         onnxUrl: '../models/fhn_I_decoder.onnx',
         title: 'FitzHugh-Nagumo VAE Latent Space Explorer (I varies)',
-        ch1: 'Membrane voltage v(t)',
-        ch2: 'Recovery variable w(t)',
+        channelLabels: ['Membrane voltage v(t)', 'Recovery variable w(t)'],
         paramLabel: 'I',
         colorScale: t => d3.hsl(30, 0.5 + t * 0.5, 0.8 - t * 0.45).toString(),
         precision: 2,
@@ -465,42 +485,505 @@
         </div>
       </div>`,
       },
+      // ── Duffing oscillator ────────────────────────────────────────────
+      duffing_delta: {
+        family: 'Duffing', paramSymbol: 'δ',
+        dataUrl: 'duffing_delta_data_for_d3.json',
+        onnxUrl: '../models/duffing_delta_decoder.onnx',
+        title: 'Duffing VAE Latent Space Explorer (δ varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'δ',
+        colorScale: t => d3.hsl(210, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Duffing oscillator (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} + {\\color{#ffd166}{\\delta}}\\,\\dot{x} + \\alpha\\,x + \\beta\\,x^3 = \\gamma\\cos(\\omega\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">δ (damping)</span> &ensp;∈ [0.05, 0.5]<br>
+          Fixed: α = -1, β = 1, γ = 0.5, ω = 1.2, (x₀, v₀) = (0, 0)
+        </div>
+      </div>`,
+      },
+      duffing_alpha: {
+        family: 'Duffing', paramSymbol: 'α',
+        dataUrl: 'duffing_alpha_data_for_d3.json',
+        onnxUrl: '../models/duffing_alpha_decoder.onnx',
+        title: 'Duffing VAE Latent Space Explorer (α varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'α',
+        colorScale: t => d3.hsl(220, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Duffing oscillator (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} + \\delta\\,\\dot{x} + {\\color{#ffd166}{\\alpha}}\\,x + \\beta\\,x^3 = \\gamma\\cos(\\omega\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">α (linear stiffness)</span> &ensp;∈ [-1.5, 0.5] — bistable when negative<br>
+          Fixed: δ = 0.3, β = 1, γ = 0.5, ω = 1.2, (x₀, v₀) = (0, 0)
+        </div>
+      </div>`,
+      },
+      duffing_beta: {
+        family: 'Duffing', paramSymbol: 'β',
+        dataUrl: 'duffing_beta_data_for_d3.json',
+        onnxUrl: '../models/duffing_beta_decoder.onnx',
+        title: 'Duffing VAE Latent Space Explorer (β varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'β',
+        colorScale: t => d3.hsl(195, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Duffing oscillator (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} + \\delta\\,\\dot{x} + \\alpha\\,x + {\\color{#ffd166}{\\beta}}\\,x^3 = \\gamma\\cos(\\omega\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">β (cubic nonlinearity)</span> &ensp;∈ [0.5, 2.0]<br>
+          Fixed: δ = 0.3, α = -1, γ = 0.5, ω = 1.2, (x₀, v₀) = (0, 0)
+        </div>
+      </div>`,
+      },
+      duffing_gamma: {
+        family: 'Duffing', paramSymbol: 'γ',
+        dataUrl: 'duffing_gamma_data_for_d3.json',
+        onnxUrl: '../models/duffing_gamma_decoder.onnx',
+        title: 'Duffing VAE Latent Space Explorer (γ varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'γ',
+        colorScale: t => d3.hsl(235, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Duffing oscillator (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} + \\delta\\,\\dot{x} + \\alpha\\,x + \\beta\\,x^3 = {\\color{#ffd166}{\\gamma}}\\cos(\\omega\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">γ (forcing amplitude)</span> &ensp;∈ [0.2, 0.7] — period-doubling route to chaos<br>
+          Fixed: δ = 0.3, α = -1, β = 1, ω = 1.2, (x₀, v₀) = (0, 0)
+        </div>
+      </div>`,
+      },
+      duffing_omega: {
+        family: 'Duffing', paramSymbol: 'ω',
+        dataUrl: 'duffing_omega_data_for_d3.json',
+        onnxUrl: '../models/duffing_omega_decoder.onnx',
+        title: 'Duffing VAE Latent Space Explorer (ω varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'ω',
+        colorScale: t => d3.hsl(250, 0.6 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Duffing oscillator (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} + \\delta\\,\\dot{x} + \\alpha\\,x + \\beta\\,x^3 = \\gamma\\cos({\\color{#ffd166}{\\omega}}\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">ω (forcing frequency)</span> &ensp;∈ [0.8, 1.6]<br>
+          Fixed: δ = 0.3, α = -1, β = 1, γ = 0.5, (x₀, v₀) = (0, 0)
+        </div>
+      </div>`,
+      },
+
+      // ── Forced Van der Pol ─────────────────────────────────────────────
+      vdp_mu: {
+        family: 'Van der Pol', paramSymbol: 'μ',
+        dataUrl: 'vdp_mu_data_for_d3.json',
+        onnxUrl: '../models/vdp_mu_decoder.onnx',
+        title: 'Van der Pol VAE Latent Space Explorer (μ varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'μ',
+        colorScale: t => d3.hsl(320, 0.55 + t * 0.4, 0.75 - t * 0.35).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Van der Pol (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} - {\\color{#ffd166}{\\mu}}(1 - x^2)\\dot{x} + \\omega_0^2\\,x = \\gamma\\cos(\\omega_f\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">μ (nonlinearity)</span> &ensp;∈ [0.2, 4.0] — sinusoidal → relaxation oscillation<br>
+          Fixed: ω₀ = 1, γ = 1, ω_f = 1.4, (x₀, v₀) = (0.5, 0)
+        </div>
+      </div>`,
+      },
+      vdp_omega0: {
+        family: 'Van der Pol', paramSymbol: 'ω₀',
+        dataUrl: 'vdp_omega0_data_for_d3.json',
+        onnxUrl: '../models/vdp_omega0_decoder.onnx',
+        title: 'Van der Pol VAE Latent Space Explorer (ω₀ varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'ω₀',
+        colorScale: t => d3.hsl(335, 0.55 + t * 0.4, 0.75 - t * 0.35).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Van der Pol (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} - \\mu(1 - x^2)\\dot{x} + {\\color{#ffd166}{\\omega_0}}^2\\,x = \\gamma\\cos(\\omega_f\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">ω₀ (natural frequency)</span> &ensp;∈ [0.6, 1.4]<br>
+          Fixed: μ = 2, γ = 1, ω_f = 1.4, (x₀, v₀) = (0.5, 0)
+        </div>
+      </div>`,
+      },
+      vdp_gamma: {
+        family: 'Van der Pol', paramSymbol: 'γ',
+        dataUrl: 'vdp_gamma_data_for_d3.json',
+        onnxUrl: '../models/vdp_gamma_decoder.onnx',
+        title: 'Van der Pol VAE Latent Space Explorer (γ varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'γ',
+        colorScale: t => d3.hsl(305, 0.55 + t * 0.4, 0.75 - t * 0.35).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Van der Pol (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} - \\mu(1 - x^2)\\dot{x} + \\omega_0^2\\,x = {\\color{#ffd166}{\\gamma}}\\cos(\\omega_f\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">γ (forcing amplitude)</span> &ensp;∈ [0.0, 2.5] — autonomous → strongly forced<br>
+          Fixed: μ = 2, ω₀ = 1, ω_f = 1.4, (x₀, v₀) = (0.5, 0)
+        </div>
+      </div>`,
+      },
+      vdp_omegaf: {
+        family: 'Van der Pol', paramSymbol: 'ω_f',
+        dataUrl: 'vdp_omegaf_data_for_d3.json',
+        onnxUrl: '../models/vdp_omegaf_decoder.onnx',
+        title: 'Van der Pol VAE Latent Space Explorer (ω_f varies)',
+        channelLabels: ['Position x(t)', 'Velocity v(t)'],
+        paramLabel: 'ω_f',
+        colorScale: t => d3.hsl(290, 0.55 + t * 0.4, 0.75 - t * 0.35).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Van der Pol (forced)</div>
+        <div class="eq-body">
+          $\\ddot{x} - \\mu(1 - x^2)\\dot{x} + \\omega_0^2\\,x = \\gamma\\cos({\\color{#ffd166}{\\omega_f}}\\,t)$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">ω_f (forcing frequency)</span> &ensp;∈ [0.6, 2.0] — Arnold tongues / sync<br>
+          Fixed: μ = 2, ω₀ = 1, γ = 1, (x₀, v₀) = (0.5, 0)
+        </div>
+      </div>`,
+      },
+
+      // ── Lorenz attractor (chaotic, 3-channel) ──────────────────────────
+      lorenz_sigma: {
+        family: 'Lorenz', paramSymbol: 'σ', chaotic: true,
+        dataUrl: 'lorenz_sigma_data_for_d3.json',
+        onnxUrl: '../models/lorenz_sigma_decoder.onnx',
+        title: 'Lorenz VAE Latent Space Explorer (σ varies, chaotic)',
+        channelLabels: ['x(t)', 'y(t)', 'z(t)'],
+        paramLabel: 'σ',
+        colorScale: t => d3.hsl(50, 0.7 + t * 0.3, 0.7 - t * 0.35).toString(),
+        precision: 1,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Lorenz attractor (chaotic)</div>
+        <div class="eq-body">
+          $\\dot{x} = {\\color{#ffd166}{\\sigma}}(y - x)$<br>
+          $\\dot{y} = x(\\rho - z) - y$<br>
+          $\\dot{z} = x\\,y - \\beta\\,z$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">σ (Prandtl number)</span> &ensp;∈ [5, 20]<br>
+          Fixed: ρ = 28, β = 8/3, (x₀, y₀, z₀) = (1, 1, 1)
+        </div>
+      </div>`,
+      },
+      lorenz_rho: {
+        family: 'Lorenz', paramSymbol: 'ρ', chaotic: true,
+        dataUrl: 'lorenz_rho_data_for_d3.json',
+        onnxUrl: '../models/lorenz_rho_decoder.onnx',
+        title: 'Lorenz VAE Latent Space Explorer (ρ varies, chaotic)',
+        channelLabels: ['x(t)', 'y(t)', 'z(t)'],
+        paramLabel: 'ρ',
+        colorScale: t => d3.hsl(40, 0.7 + t * 0.3, 0.7 - t * 0.35).toString(),
+        precision: 1,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Lorenz attractor (chaotic)</div>
+        <div class="eq-body">
+          $\\dot{x} = \\sigma(y - x)$<br>
+          $\\dot{y} = x({\\color{#ffd166}{\\rho}} - z) - y$<br>
+          $\\dot{z} = x\\,y - \\beta\\,z$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">ρ (Rayleigh number)</span> &ensp;∈ [10, 40] — chaos onset near ρ ≈ 24.74<br>
+          Fixed: σ = 10, β = 8/3, (x₀, y₀, z₀) = (1, 1, 1)
+        </div>
+      </div>`,
+      },
+      lorenz_beta: {
+        family: 'Lorenz', paramSymbol: 'β', chaotic: true,
+        dataUrl: 'lorenz_beta_data_for_d3.json',
+        onnxUrl: '../models/lorenz_beta_decoder.onnx',
+        title: 'Lorenz VAE Latent Space Explorer (β varies, chaotic)',
+        channelLabels: ['x(t)', 'y(t)', 'z(t)'],
+        paramLabel: 'β',
+        colorScale: t => d3.hsl(60, 0.7 + t * 0.3, 0.7 - t * 0.35).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Lorenz attractor (chaotic)</div>
+        <div class="eq-body">
+          $\\dot{x} = \\sigma(y - x)$<br>
+          $\\dot{y} = x(\\rho - z) - y$<br>
+          $\\dot{z} = x\\,y - {\\color{#ffd166}{\\beta}}\\,z$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">β (geometric factor)</span> &ensp;∈ [1.5, 4.0]<br>
+          Fixed: σ = 10, ρ = 28, (x₀, y₀, z₀) = (1, 1, 1)
+        </div>
+      </div>`,
+      },
+
+      // ── Brusselator ────────────────────────────────────────────────────
+      brusselator_A: {
+        family: 'Brusselator', paramSymbol: 'A',
+        dataUrl: 'brusselator_A_data_for_d3.json',
+        onnxUrl: '../models/brusselator_A_decoder.onnx',
+        title: 'Brusselator VAE Latent Space Explorer (A varies)',
+        channelLabels: ['x(t)', 'y(t)'],
+        paramLabel: 'A',
+        colorScale: t => d3.hsl(175, 0.55 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Brusselator (chemical oscillator)</div>
+        <div class="eq-body">
+          $\\dot{x} = {\\color{#ffd166}{A}} + x^2 y - (B+1)x$<br>
+          $\\dot{y} = B\\,x - x^2 y$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">A (substrate input rate)</span> &ensp;∈ [0.5, 2.5]<br>
+          Fixed: B = 3, (x₀, y₀) = (1, 1) — Hopf bifurcation at B = 1 + A²
+        </div>
+      </div>`,
+      },
+      brusselator_B: {
+        family: 'Brusselator', paramSymbol: 'B',
+        dataUrl: 'brusselator_B_data_for_d3.json',
+        onnxUrl: '../models/brusselator_B_decoder.onnx',
+        title: 'Brusselator VAE Latent Space Explorer (B varies)',
+        channelLabels: ['x(t)', 'y(t)'],
+        paramLabel: 'B',
+        colorScale: t => d3.hsl(160, 0.55 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Brusselator (chemical oscillator)</div>
+        <div class="eq-body">
+          $\\dot{x} = A + x^2 y - ({\\color{#ffd166}{B}}+1)x$<br>
+          $\\dot{y} = {\\color{#ffd166}{B}}\\,x - x^2 y$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">B (autocatalytic rate)</span> &ensp;∈ [1.5, 4.5] — crosses Hopf at B = 1 + A² = 2<br>
+          Fixed: A = 1, (x₀, y₀) = (1, 1)
+        </div>
+      </div>`,
+      },
+
+      // ── Sel'kov glycolysis ─────────────────────────────────────────────
+      selkov_a: {
+        family: "Sel'kov", paramSymbol: 'a',
+        dataUrl: 'selkov_a_data_for_d3.json',
+        onnxUrl: '../models/selkov_a_decoder.onnx',
+        title: "Sel'kov VAE Latent Space Explorer (a varies)",
+        channelLabels: ['x(t)', 'y(t)'],
+        paramLabel: 'a',
+        colorScale: t => d3.hsl(290, 0.55 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Sel'kov glycolysis</div>
+        <div class="eq-body">
+          $\\dot{x} = -x + {\\color{#ffd166}{a}}\\,y + x^2 y$<br>
+          $\\dot{y} = b - {\\color{#ffd166}{a}}\\,y - x^2 y$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">a (linear feedback rate)</span> &ensp;∈ [0.05, 0.2]<br>
+          Fixed: b = 0.6, (x₀, y₀) = (1, 1)
+        </div>
+      </div>`,
+      },
+      selkov_b: {
+        family: "Sel'kov", paramSymbol: 'b',
+        dataUrl: 'selkov_b_data_for_d3.json',
+        onnxUrl: '../models/selkov_b_decoder.onnx',
+        title: "Sel'kov VAE Latent Space Explorer (b varies)",
+        channelLabels: ['x(t)', 'y(t)'],
+        paramLabel: 'b',
+        colorScale: t => d3.hsl(275, 0.55 + t * 0.4, 0.75 - t * 0.4).toString(),
+        precision: 2,
+        eqHtml: `
+      <div class="eq-block">
+        <div class="eq-title">Sel'kov glycolysis</div>
+        <div class="eq-body">
+          $\\dot{x} = -x + a\\,y + x^2 y$<br>
+          $\\dot{y} = {\\color{#ffd166}{b}} - a\\,y - x^2 y$
+        </div>
+        <div class="eq-fixed">
+          Varied: <span class="varied">b (substrate flux)</span> &ensp;∈ [0.4, 1.2]<br>
+          Fixed: a = 0.1, (x₀, y₀) = (1, 1)
+        </div>
+      </div>`,
+      },
     };
 
     let currentModel = 'lv';
+    let currentFamily = MODELS['lv'].family;
     let cache = {};
 
+    // Group MODELS by family — preserves insertion order (also presentation order)
+    const FAMILIES = (() => {
+      const fams = {};
+      for (const [id, cfg] of Object.entries(MODELS)) {
+        (fams[cfg.family] ||= []).push(id);
+      }
+      return fams;
+    })();
+
+    function setStatus(msg) {
+      const bar = document.getElementById('status-bar');
+      bar.innerHTML = msg || '';
+    }
+
     async function loadModel(id) {
-      if (cache[id]) return;
+      if (cache[id]) return cache[id];
       const cfg = MODELS[id];
       const [data, session] = await Promise.all([
         d3.json(cfg.dataUrl),
         ort.InferenceSession.create(cfg.onnxUrl),
       ]);
       cache[id] = { data, session };
+      return cache[id];
+    }
+
+    function buildFamilyBar() {
+      const bar = document.getElementById('family-bar');
+      bar.innerHTML = '';
+      for (const fam of Object.keys(FAMILIES)) {
+        const btn = document.createElement('button');
+        btn.textContent = fam;
+        const firstId = FAMILIES[fam][0];
+        if (MODELS[firstId].chaotic) {
+          const tag = document.createElement('span');
+          tag.className = 'chaos-tag';
+          tag.textContent = 'CHAOTIC';
+          btn.appendChild(tag);
+        }
+        if (fam === currentFamily) btn.classList.add('active');
+        btn.onclick = () => selectFamily(fam);
+        bar.appendChild(btn);
+      }
+    }
+
+    function buildParamBar() {
+      const bar = document.getElementById('param-bar');
+      bar.innerHTML = '';
+      for (const id of FAMILIES[currentFamily]) {
+        const btn = document.createElement('button');
+        btn.innerHTML = MODELS[id].paramSymbol;
+        if (id === currentModel) btn.classList.add('active');
+        btn.onclick = () => switchModel(id);
+        bar.appendChild(btn);
+      }
+    }
+
+    async function selectFamily(fam) {
+      if (fam === currentFamily) return;
+      currentFamily = fam;
+      buildFamilyBar();
+      // Switch to first model in family
+      switchModel(FAMILIES[fam][0]);
     }
 
     async function switchModel(id) {
-      if (id === currentModel) return;
-      await loadModel(id);
+      if (id === currentModel && cache[id]) return;
       currentModel = id;
-      document.getElementById('btn-lv').classList.toggle('active', id === 'lv');
-      document.getElementById('btn-lv-gamma').classList.toggle('active', id === 'lv_gamma');
-      document.getElementById('btn-lv-beta').classList.toggle('active', id === 'lv_beta');
-      document.getElementById('btn-fhn').classList.toggle('active', id === 'fhn');
-      document.getElementById('btn-fhn-I').classList.toggle('active', id === 'fhn_I');
-      render(id);
+      currentFamily = MODELS[id].family;
+      buildFamilyBar();
+      buildParamBar();
+      // Show equations immediately even if data is still loading
+      const eqPanel = document.getElementById('eq-panel');
+      eqPanel.innerHTML = MODELS[id].eqHtml;
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([eqPanel]).catch(() => {});
+      }
+      setStatus('Loading…');
+      try {
+        await loadModel(id);
+        setStatus('');
+        render(id);
+      } catch (err) {
+        console.warn('Failed to load model', id, err);
+        clearAllPlots();
+        setStatus(
+          `Model <code>${id}</code> hasn't been trained yet. ` +
+          `Run <code>python src/solve_odes.py --model ${id}</code>, ` +
+          `<code>python src/train_vae.py --model ${id}</code>, ` +
+          `then <code>python src/export_for_d3.py --model ${id}</code>.`
+        );
+      }
+    }
+
+    function clearAllPlots() {
+      d3.select('#latent-plot').selectAll('*').remove();
+      d3.select('#legend').selectAll('*').remove();
+      d3.select('#amp-plot').selectAll('*').remove();
+      d3.select('#phase-plot').selectAll('*').remove();
+      document.getElementById('trajectory-container').innerHTML = '';
     }
 
     function render(id) {
       const cfg = MODELS[id];
       const { data, session } = cache[id];
       const { samples, x_mean, x_std, meta } = data;
+      const nChannels = meta.n_channels || 2;
+      const channelLabels = cfg.channelLabels ||
+        (nChannels === 3 ? ['x(t)', 'y(t)', 'z(t)'] : ['ch₁(t)', 'ch₂(t)']);
 
-      // Update labels
+      // Helper that hides whether a sample stores channels in the new
+      // `channels` array or the old `prey`/`predator` keys.
+      const getCh = (d, c) =>
+        d.channels ? d.channels[c] : (c === 0 ? d.prey : d.predator);
+
+      // Update title
       document.getElementById('main-title').textContent = cfg.title;
-      document.getElementById('ch1-label').innerHTML = cfg.ch1;
-      document.getElementById('ch2-label').innerHTML = cfg.ch2;
+
+      // Build trajectory panels dynamically — one per channel
+      const trajContainer = document.getElementById('trajectory-container');
+      trajContainer.innerHTML = '';
+      const trajPlotEls = [];
+      const trajLabelEls = [];
+      for (let c = 0; c < nChannels; c++) {
+        const panel = document.createElement('div');
+        panel.className = 'panel traj-panel';
+        const h2 = document.createElement('h2');
+        h2.innerHTML = channelLabels[c] || `channel ${c}`;
+        const plot = document.createElement('div');
+        plot.className = 'traj-plot';
+        const lbl = document.createElement('div');
+        lbl.className = 'decoded-label';
+        panel.appendChild(h2);
+        panel.appendChild(plot);
+        panel.appendChild(lbl);
+        trajContainer.appendChild(panel);
+        trajPlotEls.push(plot);
+        trajLabelEls.push(lbl);
+      }
 
       // Update equation panel and re-typeset MathJax
       const eqPanel = document.getElementById('eq-panel');
@@ -524,15 +1007,11 @@
       let setDecodedFeat = () => { };
       let clearDecodedFeat = () => { };
 
-      // Clear previous plots
+      // Clear previous plots (trajectory panels were already replaced above)
       d3.select('#latent-plot').selectAll('*').remove();
       d3.select('#legend').selectAll('*').remove();
-      d3.select('#prey-plot').selectAll('*').remove();
-      d3.select('#pred-plot').selectAll('*').remove();
       d3.select('#amp-plot').selectAll('*').remove();
       d3.select('#phase-plot').selectAll('*').remove();
-      d3.select('#prey-label').text('');
-      d3.select('#pred-label').text('');
       d3.select('#amp-label').text('');
       d3.select('#phase-label').text('');
 
@@ -630,7 +1109,8 @@
           highlightDot(this);
           highlightFeatById(d.id);
           clearDecodedFeat();
-          showTrajectory(d.prey, d.predator,
+          const chs = Array.from({ length: nChannels }, (_, c) => getCh(d, c));
+          showTrajectory(chs,
             `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
             color(+d.alpha.toFixed(cfg.precision)));
           moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
@@ -678,11 +1158,13 @@
         return s;
       }
 
-      const preySvg = makeTrajectoryPlot('#prey-plot');
-      const predSvg = makeTrajectoryPlot('#pred-plot');
+      // Build one trajectory svg per channel (panels were created above).
+      const trajSvgs = trajPlotEls.map(el => makeTrajectoryPlot(el));
 
       // --- Feature Plots: parameter vs amplitude, parameter vs phase ---
-      const features = samples.map(d => paramFeatures(d.prey, d.predator));
+      // Always uses the first two channels; the third channel (if any) just
+      // gets plotted but doesn't enter the amplitude/phase computation.
+      const features = samples.map(d => paramFeatures(getCh(d, 0), getCh(d, 1)));
 
       const paramExtent = d3.extent(samples, d => d.alpha);
       const paramPad = (paramExtent[1] - paramExtent[0]) * 0.06 || 0.05;
@@ -752,7 +1234,8 @@
             if (lDot) highlightDot(lDot);
             highlightFeatById(d.id);
             clearDecodedFeat();
-            showTrajectory(d.prey, d.predator,
+            const chs = Array.from({ length: nChannels }, (_, c) => getCh(d, c));
+            showTrajectory(chs,
               `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
               color(+d.alpha.toFixed(cfg.precision)));
             moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
@@ -829,31 +1312,31 @@
           .attr('d', line)
           .attr('stroke', lineColor);
 
-        d3.select(labelEl).text(label);
+        if (labelEl) d3.select(labelEl).text(label);
       }
 
-      function showTrajectory(prey, predator, label, lineColor) {
-        drawLine(preySvg, prey, lineColor, '#prey-label', label);
-        drawLine(predSvg, predator, lineColor, '#pred-label', label);
+      function showTrajectory(channels, label, lineColor) {
+        for (let c = 0; c < nChannels; c++) {
+          drawLine(trajSvgs[c], channels[c], lineColor, trajLabelEls[c], label);
+        }
       }
 
       async function decodeAt(z1, z2) {
         const zTensor = new ort.Tensor('float32', Float32Array.from([z1, z2]), [1, 2]);
         const results = await session.run({ z: zTensor });
         const recon = results.x_recon.data;
-        const prey = [];
-        const predator = [];
+        // De-interleave: data layout is (t0_c0, t0_c1, ..., t0_cN, t1_c0, ...)
+        const channels = Array.from({ length: nChannels }, () => []);
         for (let i = 0; i < recon.length; i++) {
           const raw = recon[i] * xStd[i] + xMean[i];
-          if (i % 2 === 0) prey.push(raw);
-          else predator.push(raw);
+          channels[i % nChannels].push(raw);
         }
         const label = `Decoded at z = [${z1.toFixed(2)}, ${z2.toFixed(2)}]`;
-        showTrajectory(prey, predator, label, '#ffd166');
+        showTrajectory(channels, label, '#ffd166');
         moveCrosshair(xScale(z1), yScale(z2));
         clearHighlight();
         clearFeatHighlight();
-        setDecodedFeat(paramFeatures(prey, predator), label);
+        setDecodedFeat(paramFeatures(channels[0], channels[1]), label);
       }
 
       function moveCrosshair(cx, cy) {
@@ -874,7 +1357,8 @@
       // Show first sample by default
       if (samples.length > 0) {
         const d = samples[0];
-        showTrajectory(d.prey, d.predator,
+        const chs = Array.from({ length: nChannels }, (_, c) => getCh(d, c));
+        showTrajectory(chs,
           `Sample (${cfg.paramLabel} = ${d.alpha.toFixed(cfg.precision)})`,
           color(+d.alpha.toFixed(cfg.precision)));
         moveCrosshair(xScale(d.z[0]), yScale(d.z[1]));
@@ -882,13 +1366,23 @@
       }
     }
 
-    // Boot — show equations immediately, then load data
-    const eqPanel = document.getElementById('eq-panel');
-    eqPanel.innerHTML = MODELS['lv'].eqHtml;
-    if (window.MathJax && MathJax.typesetPromise) {
-      MathJax.typesetPromise([eqPanel]).catch(() => { });
+    // Boot: render the two selector bars, show default equations, load default model
+    buildFamilyBar();
+    buildParamBar();
+    {
+      const eqPanel = document.getElementById('eq-panel');
+      eqPanel.innerHTML = MODELS['lv'].eqHtml;
+      if (window.MathJax && MathJax.typesetPromise) {
+        MathJax.typesetPromise([eqPanel]).catch(() => { });
+      }
     }
-    loadModel('lv').then(() => render('lv'));
+    loadModel('lv').then(() => render('lv')).catch(err => {
+      console.warn('Failed to load default model', err);
+      setStatus(
+        `Default model <code>lv</code> hasn't been built yet. ` +
+        `Run <code>bash run_pipeline.sh</code> first.`
+      );
+    });
   </script>
 </body>
 
