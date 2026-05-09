@@ -192,7 +192,7 @@ lazy-loaded on first selection and cached for instant re-switching.
 
 \medskip
 
-\textbf{Unique Selling Point}. While most visualizations online focus on a static set of input values and parameters and showing a single set of trajectories, our visualization can visualize an essentially infinite (thanks to in-browser VAE interpolation) amount of trajectories for varied parameter values. While showing the trajectories (along with phase and amplitude), a 2-D latent space view visualizes hard-to-digest system dynamics. And this whole system can work for multiple different ODEs even as the number of parameters scale up.
+\textbf{Unique Selling Point}. While most visualizations online focus on a static set of input values and parameters for which they show a single set of trajectories, our visualization can display an essentially infinite (thanks to in-browser VAE interpolation) amount of trajectories for varied parameter values, allowing for exploration of un-tested parameters. We also enable the display of the trajectories (along with phase and amplitude) for the given-data and inferred values, a 2-D latent space view  which visualizes hard-to-digest system dynamics. We also demonstrate that this pipeline can work for multiple different ODEs even as the number of parameters and equations scale up.
 
 \subsection{Scalability to Multiple ODE Systems}
 Because the VAE encoder maps trajectory windows $\mathbf{x} \in
@@ -213,7 +213,7 @@ routine, and visualizer are unchanged.
     \label{fig:main_view}
 \end{figure}
 
-Under Figure (\ref{fig:main_view}) we observe our main view for one of the equations and a parameter sweep. Under this we observe the equation being encoded, and the parameter being swept (in yellow). We also observe the latent space view, which allows us to identify a common direction for our change in paramater, e.g. we can observe that as the circles get smaller the value of alpha decreases somewhat linearly, which tells us that there is a direction of the parameter that is being encoded. In the parameter effects view in the model, we can see a similar linear trend where the change in alpha seems to be positively correlated to amplitude, so it is likely that our latent space encoded that as the direction towards the middle. The rightmost plot allows us to see those effects first-hand through the trajectories selected.
+Under Figure (\ref{fig:main_view}) we observe our main view for one of the equations and a parameter (in yellow) sweep. We also observe the latent space view, which allows us to identify a common direction for our change in paramater, e.g. we can observe that as the circles get smaller the value of alpha decreases somewhat linearly, which tells us that there is a direction of the parameter that is being encoded. In the parameter effects view in the model, we can see a similar linear trend where the change in alpha seems to be positively correlated to amplitude, so it is likely that our latent space encoded that as the direction towards the middle. The rightmost plot allows us to see those effects first-hand through the trajectories selected.
 
 \begin{figure}[H]
     \centering
@@ -234,7 +234,7 @@ Interactions allow for the clicking of the top buttons which changes to differen
 
 \subsection{AI Use}
 
-We used AI to aid us in generating javascript code with d3, and html code to visualize our generated datasets. To achieve this we created a schema from scratch, writing down with rigor how the data was sampled, how we expect it to be visualized, and what interactions we are interested in, this schema was updated in an iterative manner as to include new things added by the AI, and or any changes that were made to accomodate project needs.
+We used AI to aid us in generating javascript code with d3, html code to visualize our generated datasets, and to seek ways to improve our VAE model architecture. To achieve this we created a schema from scratch, writing down with rigor how the data was sampled, how we expect it to be visualized, and what interactions we are interested in, this schema was updated in an iterative manner as to include new things added by the AI, and or any changes that were made to accomodate project needs. The model used throughout development was Claude's Opus 4.6 and Opus 4.7.
 
 \section{Dataset(s)}
 Our framework generates all data synthetically by numerically integrating
@@ -369,7 +369,7 @@ We were able to train the VAE to produce a latent space in which trajectories wi
 similar qualitative behavior (e.g., periodic, chaotic) form coherent clusters,
 and in which transitions between regimes appear as smooth gradients or sharp
 boundaries that correspond to known bifurcations. The interactive interface
-was able to enable a users to (1)~identify qualitative behavioral regimes without
+was able to help users to (1)~identify qualitative behavioral regimes without
 manual trajectory inspection, (2)~locate parameter-space boundaries associated
 with bifurcations, and (3)~generate and inspect novel trajectories by
 navigating the latent space, thereby accelerating hypothesis formation about
@@ -502,9 +502,11 @@ We have some limitations:
 
 We also learned some valuable lessons, the most important being the value of user feedback and the \textbf{value of having many iterations of development and feedback}. More specifically:
 \begin{itemize}
-\item We had specific improvements to our visualization after we changed our random distribution of input data to a uniform distribution to make patterns in the latent space more visible. This improvement came was based on feedback received from Taoseef Aziz after our Interim Presentation.
+\item We made specific improvements to our visualization after we changed our random distribution of input data to a uniform distribution to make patterns in the latent space more visible. This improvement was based on feedback received from Taoseef Aziz after our Interim Presentation.
 
-\item We saw the real value of user feedback in our work after specific suggestions like the uniform window suggestion from Taoseef and the limitation of the clicakble Latent Space view suggestion by Aiden.
+\item It was interesting to note that while charting various ODEs, the chaotic Lorenz system looks like it is being visualized with no problem. However, thanks to our specific knowledge of the ODEs being visualized, we knew that it was misleading to a prospective user that was not aware of how chaotic ODEs work. Here, we learned the value of having in-depth knowledge of the data that is being visualized.
+
+\item We saw the value of user feedback in our work after specific suggestions like the uniform window suggestion from Taoseef and the limitation of the clickable Latent Space view suggestion by Aiden.
 
 \end{itemize}
 
