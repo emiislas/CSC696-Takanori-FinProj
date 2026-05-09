@@ -5,3 +5,5 @@
 .claude
 .DS_Store
 __pycache__
+report/contribution.pdf
+report/contribution.md
